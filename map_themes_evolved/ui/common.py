@@ -16,6 +16,15 @@ PLUGIN_NAME = "Map Themes Evolved"
 SETTINGS_PREFIX = "MapThemesEvolved/"
 
 
+def event_pos(event):
+    """Mouse position in widget coordinates (Qt5 ``pos()`` / Qt6 ``position()``)."""
+    return event.position().toPoint() if hasattr(event, "position") else event.pos()
+
+
+def event_global_pos(event):
+    return event.globalPosition().toPoint() if hasattr(event, "globalPosition") else event.globalPos()
+
+
 def tr(text):
     return QCoreApplication.translate("MapThemesEvolved", text)
 
@@ -42,6 +51,7 @@ _THEME_ICONS = {
     "new-folder": (None, "mActionNewFolder.svg"),
     "delete": (None, "symbologyRemove.svg"),
     "undo": (None, "mActionUndo.svg"),
+    "history": (None, "mActionHistory.svg"),
     "panel": (None, "mDockify.svg"),
     "copy": (None, "mActionEditCopy.svg"),
     "pin": (None, "pin.svg"),

@@ -72,7 +72,7 @@ class ThemeTreeModel(QStandardItemModel):
         lines += [f"• {_esc(n)}" for n in layers[:TOOLTIP_LAYER_LIMIT]]
         if len(layers) > TOOLTIP_LAYER_LIMIT:
             lines.append("…")
-        lines.append(f"<i>{tr('Click to apply · F2 to rename · drag to move')}</i>")
+        lines.append(f"<i>{tr('Double-click or Enter to apply · F2 to rename · drag to move')}</i>")
         return "<br>".join(lines)
 
     def setData(self, index, value, role=Qt.ItemDataRole.EditRole):

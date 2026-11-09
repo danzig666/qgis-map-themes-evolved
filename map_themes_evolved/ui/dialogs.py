@@ -68,9 +68,11 @@ class _BaseDialog(QDialog):
 class FolderDialog(_BaseDialog):
     """New subfolder, or rename/move a whole folder."""
 
-    def __init__(self, parent, service, title, initial_folder=(), old_folder=None, ok_text=None):
+    def __init__(self, parent, service, title, initial_folder=(), old_folder=None, ok_text=None,
+                 allow_existing=False):
         super().__init__(parent, title, ok_text)
         self.service = service
+        self.allow_existing = allow_existing
         self.sep = service.separator
         self.spaced = service.spaced
         self.old_folder = tuple(old_folder) if old_folder is not None else None
@@ -111,7 +113,10 @@ class FolderDialog(_BaseDialog):
         if not error:
             if self.old_folder is None:
                 if folder in self.service.folders():
-                    error = tr("This folder already exists.")
+                    if self.allow_existing:
+                        info = tr("The items will be moved into this existing folder.")
+                    else:
+                        error = tr("This folder already exists.")
             elif folder == self.old_folder:
                 error = tr("The folder path is unchanged.")
             else:

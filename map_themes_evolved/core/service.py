@@ -187,6 +187,24 @@ class ThemeService(QObject):
         last = self.last_applied if self.last_applied and self.has(self.last_applied) else None
         return current, last
 
+    def apply_record(self, record):
+        """Apply a stored layer state that is not (necessarily) a saved theme.
+
+        Uses a hidden temporary theme with the collection's signals blocked, so
+        QGIS's own, complete apply logic runs (visibility, legend items, styles)
+        without anything else seeing the temporary theme.
+        """
+        coll = self.collection
+        root, model = self._tree()
+        tmp = "⁣mte-history-restore"
+        blocked = coll.blockSignals(True)
+        try:
+            coll.insert(tmp, record)
+            coll.applyTheme(tmp, root, model)
+        finally:
+            coll.removeMapTheme(tmp)
+            coll.blockSignals(blocked)
+
     def add_from_current(self, name):
         self.collection.insert(name, self.current_record())
 

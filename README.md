@@ -10,14 +10,17 @@ Folders are just part of the theme name: `Debrecen/Land use/Residential` shows u
 
 Click the **eye button** in the Layers panel.
 
-- **Click a theme** to apply it, the same as the original menu. **Click a folder** to open or close it.
+- **Click** selects (Ctrl/Shift+click selects several). **Double-click**, **Enter** or the **Apply** button applies a theme, so a stray click never changes your map.
 - **Type** to search. Words can be in any order, and case and accents are ignored (`viz telek` finds `Vizsgálat - Telekméretek`). Press **Enter** to apply the best match.
 - The **status line** shows the active theme. If you changed layers since applying a theme, it says so and offers **Update** (overwrite that theme) and **Save as new…**.
 - **Right-click** a theme or folder for everything else: update, rename, **Move to ▸**, duplicate, copy name, delete, and new theme or subfolder here.
 - **Drag** themes or folders onto a folder to move them, or onto empty space to move them to the top level.
+- **Group:** select several themes, then press **Group…** (or Ctrl+G, or right-click) to put them into a new or existing folder in one step.
+- **History** (clock button): the last 15 layer-visibility states, newest first. One click takes the layers back to any of them, so an accidental *Hide All* or a mis-click in the Layers panel is easy to undo. Your saved themes aren't touched.
 - **New theme** and **New folder** add a row you type the name into. Type `Area/Topic/Name` to create subfolders on the fly.
 - Every change can be **undone**: use the message bar's *Undo*, the ↶ button, or *Plugins ▸ Map Themes Evolved*.
 - **Open as panel** (window icon) docks the same browser beside the map, which is handy for longer organising sessions.
+- **Window position:** drag the popup by its title bar and it reopens there. Double-click the title bar to put it back under the eye button. The popup and panel positions are saved in your QGIS settings, not the project. If a monitor is unplugged or the resolution changes, they're moved back onto a visible screen.
 - The **Layers:** row holds QGIS's own Show All / Hide All / Show Selected… actions, unchanged.
 - **Right-click the eye button**, or use *⋯ ▸ Classic QGIS map themes menu*, for the original menu.
 
@@ -25,10 +28,12 @@ Click the **eye button** in the Layers panel.
 |---|---|
 | type | search |
 | ↑ / ↓ | move through the list |
-| Enter | apply theme and close |
-| Ctrl+Enter, Ctrl+click, middle-click | apply theme and keep the list open (or use 📌) |
-| F2 | rename in place |
-| Del | delete (can be undone) |
+| Enter, double-click | apply theme (and close the popup) |
+| Ctrl+Enter, middle-click | apply theme and keep the list open (or use 📌) |
+| Ctrl/Shift+click | select several |
+| Ctrl+G | group the selection into a folder |
+| F2, or a slow second click | rename in place |
+| Del | delete the selection (can be undone) |
 | Esc | clear the search, then close |
 
 You can assign a shortcut to *Browse Map Themes…* in *Settings ▸ Keyboard Shortcuts*.

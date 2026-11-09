@@ -2,9 +2,11 @@
 
 Interaction model
 -----------------
-* Click a theme = apply it (like the native menu). Click a folder = open/close it.
-* Everything else is on the row itself: right-click menu, F2 rename in place,
-  Del delete, drag onto a folder to move.
+* Click selects (Ctrl/Shift for several). **Double-click, Enter or Apply** applies,
+  so a stray click never changes the map.
+* Everything else is on the row itself: right-click menu, F2 / slow second click
+  rename in place, Del delete, Ctrl+G group the selection, drag onto a folder to move.
+* The history button restores any of the last layer-visibility states.
 * The status strip says which theme is active, or that the layers changed since
   a theme was applied, with one-click **Update** / **Save as new**.
 * New themes and folders are typed straight into the tree (no dialog).
@@ -24,7 +26,7 @@ from qgis.core import QgsSettings
 from qgis.gui import QgsFilterLineEdit
 
 from ..core import paths
-from .common import SETTINGS_PREFIX, QAction, theme_icon, tr
+from .common import SETTINGS_PREFIX, QAction, event_pos, theme_icon, tr
 from .dialogs import FolderDialog
 from .model import KIND_ROLE, NAME_ROLE, PATH_ROLE, ThemeTreeModel, folder_to_key, item_key, key_to_folder
 
@@ -81,9 +83,11 @@ class ThemeBrowser(QWidget):
     closeRequested = pyqtSignal()
     openPanelRequested = pyqtSignal()
 
-    def __init__(self, service, undo, notifier, iface, host=None, classic_menu=None, parent=None):
+    def __init__(self, service, undo, notifier, iface, host=None, classic_menu=None, history=None,
+                 parent=None):
         super().__init__(parent)
         self.service = service
+        self.history = history
         self.undo = undo
         self.notifier = notifier
         self.iface = iface
@@ -166,6 +170,19 @@ class ThemeBrowser(QWidget):
         st.addWidget(self.status_text, 1)
         st.addWidget(self.btn_update)
         st.addWidget(self.btn_save_new)
+        if self.history is not None:
+            self.btn_history = QToolButton(self.status)
+            self.btn_history.setIcon(theme_icon("history"))
+            self.btn_history.setAutoRaise(True)
+            self.btn_history.setToolTip(tr("Layer visibility history — go back to an earlier "
+                                           "state of the layer checkboxes"))
+            self.btn_history.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+            self.history_menu = QMenu(self.btn_history)
+            self.history_menu.aboutToShow.connect(self._fill_history_menu)
+            self.btn_history.setMenu(self.history_menu)
+            st.addWidget(self.btn_history)
+            self.history.changed.connect(self._on_history_changed)
+            self._on_history_changed()
         lay.addWidget(self.status)
 
         # tree ----------------------------------------------------------------
@@ -173,9 +190,13 @@ class ThemeBrowser(QWidget):
         self.tree.setModel(self.model)
         self.tree.setHeaderHidden(True)
         self.tree.setUniformRowHeights(True)
-        self.tree.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.tree.setEditTriggers(QAbstractItemView.EditTrigger.EditKeyPressed)
+        self.tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        # click selects; a second slow click on a selected row (or F2) renames
+        self.tree.setEditTriggers(QAbstractItemView.EditTrigger.EditKeyPressed
+                                  | QAbstractItemView.EditTrigger.SelectedClicked)
         self.tree.setExpandsOnDoubleClick(False)
+        self.tree.doubleClicked.connect(lambda idx: self.activate(idx))
+        self.tree.selectionModel().selectionChanged.connect(lambda *_: self._update_actions())
         self.tree.setMouseTracking(True)
         self.tree.setDragEnabled(True)
         self.tree.setAcceptDrops(True)
@@ -194,6 +215,12 @@ class ThemeBrowser(QWidget):
         lay.addWidget(self.tree, 1)
 
         # bottom: themes ------------------------------------------------------
+        self.act_apply = self._action("theme", tr("Apply"),
+                                      tr("Apply the selected theme (Enter or double-click)"),
+                                      lambda: self.activate(self.selected_index()))
+        self.act_group = self._action("new-folder", tr("Group…"),
+                                      tr("Put the selected themes into a new folder (Ctrl+G)"),
+                                      self.group_selected)
         self.act_new_theme = self._action("theme-new", tr("New theme"),
                                           tr("New theme from the current layers"),
                                           lambda: self.start_new_theme())
@@ -207,8 +234,15 @@ class ThemeBrowser(QWidget):
 
         row1 = QHBoxLayout()
         row1.setSpacing(2)
-        for a, text in ((self.act_new_theme, True), (self.act_new_folder, True)):
-            row1.addWidget(self._tool_button(a, text))
+        self.apply_button = self._tool_button(self.act_apply, True)
+        f = self.apply_button.font()
+        f.setBold(True)
+        self.apply_button.setFont(f)
+        row1.addWidget(self.apply_button)
+        for a in (self.act_new_theme, self.act_new_folder):
+            row1.addWidget(self._tool_button(a, True))
+        self.group_button = self._tool_button(self.act_group, True)
+        row1.addWidget(self.group_button)
         row1.addStretch(1)
         row1.addWidget(self._tool_button(self.act_undo))
         if self.host is not None:
@@ -443,7 +477,18 @@ class ThemeBrowser(QWidget):
             return paths.folder_of(key[1], self.service.separator)
         return ()
 
+    def selected_keys(self):
+        """All selected themes/folders, in tree order."""
+        rows = self.tree.selectionModel().selectedRows()
+        keys = [item_key(i) for i in rows]
+        return [k for k in keys if k and k[0] in ("theme", "folder")]
+
     def _update_actions(self):
+        key = self.selected_key()
+        selected = self.selected_keys()
+        self.act_apply.setEnabled(bool(key and key[0] == "theme"))
+        self.act_group.setEnabled(bool(self.service.separator) and bool(selected))
+        self.group_button.setVisible(len(selected) > 1)
         self.act_new_folder.setEnabled(bool(self.service.separator))
         self.act_undo.setEnabled(self.undo.can_undo())
         top = self.undo.top_text()
@@ -461,7 +506,7 @@ class ThemeBrowser(QWidget):
                 return self._tree_key(event)
         elif obj is self.tree.viewport():
             if et == QEvent.Type.MouseButtonPress:
-                self._press_pos = event.pos()
+                self._press_pos = event_pos(event)
             elif et == QEvent.Type.MouseButtonRelease:
                 return self._viewport_release(event)
         return super().eventFilter(obj, event)
@@ -496,6 +541,9 @@ class ThemeBrowser(QWidget):
         if key == Qt.Key.Key_Delete:
             self.delete_selected()
             return True
+        if key == Qt.Key.Key_G and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            self.group_selected()
+            return True
         if key == Qt.Key.Key_Escape:
             if self.search.text():
                 self.search.clear()
@@ -513,7 +561,7 @@ class ThemeBrowser(QWidget):
         return False
 
     def _viewport_release(self, event):
-        pos = event.pos()
+        pos = event_pos(event)
         press, self._press_pos = self._press_pos, None
         if press is None or (pos - press).manhattanLength() >= QApplication.startDragDistance():
             return False  # it was a drag (or the press started elsewhere)
@@ -522,12 +570,8 @@ class ThemeBrowser(QWidget):
         idx = self.tree.indexAt(pos)
         if not idx.isValid() or not self.tree.visualRect(idx).contains(pos):
             return False  # branch arrow or empty space: default behaviour
-        button = event.button()
-        if button == Qt.MouseButton.LeftButton:
-            self.tree.setCurrentIndex(idx)
-            self.activate(idx, keep_open=self._ctrl(event))
-            return True
-        if button == Qt.MouseButton.MiddleButton:
+        # a plain click only selects (handled by the view); middle-click applies
+        if event.button() == Qt.MouseButton.MiddleButton:
             self.tree.setCurrentIndex(idx)
             self.activate(idx, keep_open=True)
             return True
@@ -567,6 +611,10 @@ class ThemeBrowser(QWidget):
     # ------------------------------------------------------------------
     def _context_menu(self, pos):
         idx = self.tree.indexAt(pos)
+        selected = self.selected_keys()
+        if idx.isValid() and len(selected) > 1 and self.tree.selectionModel().isSelected(idx):
+            self._multi_context_menu(pos, selected)
+            return
         if idx.isValid():
             self.tree.setCurrentIndex(idx)
         m = QMenu(self)
@@ -614,6 +662,22 @@ class ThemeBrowser(QWidget):
             m.addSeparator()
             m.addAction(theme_icon("expand"), tr("Expand all folders"), self._expand_all)
             m.addAction(theme_icon("collapse"), tr("Collapse all folders"), self._collapse_all)
+        m.exec(self.tree.viewport().mapToGlobal(pos))
+
+    def _multi_context_menu(self, pos, keys):
+        m = QMenu(self)
+        n = len(keys)
+        if self.service.separator:
+            a = m.addAction(theme_icon("new-folder"), tr("Group {} items into a new folder…").format(n)
+                            + "\tCtrl+G", self.group_selected)
+            f = a.font()
+            f.setBold(True)
+            a.setFont(f)
+            folders = [key_to_folder(v) for k, v in keys if k == "folder"]
+            self._add_move_menu(m, keys, exclude=folders[0] if len(folders) == 1 else None)
+        m.addSeparator()
+        m.addAction(theme_icon("delete"), tr("Delete {} items…").format(n) + "\tDel",
+                    lambda: self.delete_keys(keys))
         m.exec(self.tree.viewport().mapToGlobal(pos))
 
     def _add_move_menu(self, menu, keys, exclude=None):
@@ -810,6 +874,10 @@ class ThemeBrowser(QWidget):
         self.notifier.done(tr("Duplicated as “{}”.").format(new), op)
 
     def delete_selected(self):
+        keys = self.selected_keys()
+        if len(keys) > 1:
+            self.delete_keys(keys)
+            return
         key = self.selected_key()
         if not key:
             return
@@ -817,6 +885,85 @@ class ThemeBrowser(QWidget):
             self.delete_themes([key[1]])
         elif key[0] == "folder":
             self.delete_folder(key_to_folder(key[1]))
+
+    def delete_keys(self, keys):
+        """Delete several selected themes and folders as one undoable step."""
+        sep = self.service.separator
+        all_names = self.service.names()
+        names, folders = [], []
+        for kind, val in keys:
+            if kind == "theme":
+                names.append(val)
+            else:
+                folders.append(key_to_folder(val))
+                names.extend(paths.themes_in_folder(all_names, folders[-1], sep))
+        names = list(dict.fromkeys(names))
+        if folders and names:
+            with self._modal() as parent:
+                answer = QMessageBox.question(
+                    parent, tr("Delete"),
+                    tr("Delete {0} folder(s) and {1} theme(s) in total?\n\n"
+                       "You can undo this right after.").format(len(folders), len(names)),
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                    QMessageBox.StandardButton.Cancel)
+                if answer != QMessageBox.StandardButton.Yes:
+                    return
+        for f in folders:
+            self._drop_session_folders(f)
+        if names:
+            self.delete_themes(names)
+        self.refresh()
+
+    def group_selected(self):
+        """Ask for a folder name and move all selected items into it."""
+        keys = self.selected_keys()
+        if not keys or not self.service.separator:
+            return
+        sep = self.service.separator
+        kind, val = keys[0]
+        parent = paths.folder_of(val, sep) if kind == "theme" else key_to_folder(val)[:-1]
+        with self._modal() as dlg_parent:
+            dlg = FolderDialog(dlg_parent, self.service,
+                               tr("Group {} Item(s) into Folder").format(len(keys)),
+                               initial_folder=parent, ok_text=tr("Group"), allow_existing=True)
+            if not dlg.exec():
+                return
+            folder = dlg.folder()
+        self.move_items(keys, folder)
+        self._expand_path(folder)
+        self._pending_key = ("folder", folder_to_key(folder))
+        self.refresh()
+
+    # ------------------------------------------------------------------
+    # layer visibility history
+    # ------------------------------------------------------------------
+    def _on_history_changed(self):
+        self.btn_history.setEnabled(self.history.previous() is not None)
+
+    def _fill_history_menu(self):
+        m = self.history_menu
+        m.clear()
+        entries = self.history.entries
+        if len(entries) < 2:
+            a = m.addAction(tr("No earlier layer states yet"))
+            a.setEnabled(False)
+            return
+        head = m.addAction(tr("Layer visibility history (newest first)"))
+        head.setEnabled(False)
+        m.addSeparator()
+        now = m.addAction(theme_icon("theme-current"), tr("Now — {}").format(entries[0].label))
+        now.setEnabled(False)
+        for i, entry in enumerate(entries[1:], start=1):
+            text = f"{entry.time_text()}   {entry.label}"
+            if i == 1:
+                text += "\t" + tr("previous")
+            a = m.addAction(theme_icon("undo") if i == 1 else theme_icon("history"), text)
+            a.triggered.connect(lambda _c=False, e=entry: self._restore_history(e))
+
+    def _restore_history(self, entry):
+        self.history.restore(entry)
+        self.notifier.done(tr("Layer visibility restored to {} ({}).").format(entry.time_text(), entry.label))
+        self.refresh()
 
     def delete_themes(self, names, label=None):
         removed = self.service.remove(names)

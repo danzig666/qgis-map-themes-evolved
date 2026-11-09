@@ -1,9 +1,9 @@
 """Plugin entry: wires the service, popup, dock, eye-button hook and menu actions."""
 
-from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QCursor, QIcon
 from qgis.core import QgsProject, QgsSettings
 
+from .core.history import VisibilityHistory
 from .core.service import ThemeService
 from .core.undo import UndoStack
 from .hook.eye_button import EyeButtonHook
@@ -29,18 +29,20 @@ class MapThemesEvolvedPlugin:
         self.undo = UndoStack()
         self.notifier = Notifier(iface, self.undo)
         self.service.projectReset.connect(self.undo.clear)
+        self.history = VisibilityHistory(self.service)
 
         self.hook = EyeButtonHook(iface, self._on_eye_clicked)
         self.popup = ThemePopup(self.service, self.undo, self.notifier, iface,
-                                classic_menu=self.hook.original_menu, parent=iface.mainWindow())
+                                classic_menu=self.hook.original_menu, history=self.history,
+                                parent=iface.mainWindow())
         self.popup.openPanelRequested.connect(self.show_dock)
 
         self.dock = ThemeDock(self.service, self.undo, self.notifier, iface,
-                              classic_menu=self.hook.original_menu, parent=iface.mainWindow())
-        iface.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dock)
-        self.dock.setVisible(QgsSettings().value(SETTINGS_PREFIX + "dockVisible", False, type=bool))
-        self.dock.visibilityChanged.connect(
-            lambda v: QgsSettings().setValue(SETTINGS_PREFIX + "dockVisible", v))
+                              classic_menu=self.hook.original_menu, history=self.history,
+                              parent=iface.mainWindow())
+        self.dock.add_to_main_window(
+            QgsSettings().value(SETTINGS_PREFIX + "dockVisible", False, type=bool))
+        self.dock.visibilityChanged.connect(self._remember_dock_visibility)
 
         try:
             hooked = self.hook.install()
@@ -78,6 +80,10 @@ class MapThemesEvolvedPlugin:
             act.deleteLater()
         self.actions = []
         if self.dock is not None:
+            # removing the dock hides it — that must not be remembered as "closed"
+            self.dock.visibilityChanged.disconnect(self._remember_dock_visibility)
+            self._remember_dock_visibility(self.dock.isUserVisible())
+            self.dock.save_geometry()
             self.iface.removePluginMenu(PLUGIN_NAME, self.dock.toggleViewAction())
             self.iface.removeDockWidget(self.dock)
             self.dock.deleteLater()
@@ -89,12 +95,19 @@ class MapThemesEvolvedPlugin:
             self.popup.close()
             self.popup.deleteLater()
             self.popup = None
+        if getattr(self, "history", None) is not None:
+            self.history.shutdown()
+            self.history = None
         if self.service is not None:
             self.service.shutdown()
             self.service.deleteLater()
             self.service = None
 
     # ------------------------------------------------------------------
+    @staticmethod
+    def _remember_dock_visibility(visible):
+        QgsSettings().setValue(SETTINGS_PREFIX + "dockVisible", bool(visible))
+
     def show_dock(self):
         self.popup.close()
         self.dock.setUserVisible(True)
