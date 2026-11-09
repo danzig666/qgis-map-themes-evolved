@@ -72,3 +72,9 @@ map_themes_evolved/
 ```
 
 See [PLAN.md](PLAN.md) for the design and roadmap.
+
+## License
+
+Copyright (C) 2026 danzig666
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either **version 2 of the License, or (at your option) any later version** (SPDX: `GPL-2.0-or-later`). See [LICENSE](LICENSE).
