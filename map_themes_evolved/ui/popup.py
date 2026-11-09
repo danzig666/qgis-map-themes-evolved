@@ -136,6 +136,7 @@ class ThemePopup(QFrame):
         geometry.save_geometry(GEOMETRY_NAME, self.geometry(), {"moved": self.moved_by_user})
 
     def hideEvent(self, event):
+        self.browser.cancel_editing()  # never leave a half-typed name behind
         self._save()
         self.last_hidden = time.monotonic()
         super().hideEvent(event)

@@ -4,7 +4,7 @@ Interaction model
 -----------------
 * Click selects (Ctrl/Shift for several). **Double-click, Enter or Apply** applies,
   so a stray click never changes the map.
-* Everything else is on the row itself: right-click menu, F2 / slow second click
+* Everything else is on the row itself: right-click menu, F2
   rename in place, Del delete, Ctrl+G group the selection, drag onto a folder to move.
 * **↶ / ↷ undo and redo layer visibility** (Ctrl+Z / Ctrl+Y) — the arrow next to ↶
   lists the recent layer states to jump to. Undoing *theme edits* (rename, group,
@@ -20,9 +20,9 @@ import hashlib
 import json
 
 from qgis.PyQt.QtCore import QEvent, QItemSelectionModel, QPoint, Qt, QTimer, pyqtSignal
-from qgis.PyQt.QtWidgets import (QAbstractItemView, QApplication, QFrame, QHBoxLayout, QLabel, QMenu,
-                                 QSizePolicy, QToolButton, QTreeView, QVBoxLayout,
-                                 QWidget)
+from qgis.PyQt.QtWidgets import (QAbstractItemDelegate, QAbstractItemView, QApplication, QFrame,
+                                 QHBoxLayout, QLabel, QLineEdit, QMenu, QSizePolicy, QToolButton,
+                                 QTreeView, QVBoxLayout, QWidget)
 from qgis.core import QgsSettings
 from qgis.gui import QgsFilterLineEdit
 
@@ -196,11 +196,13 @@ class ThemeBrowser(QWidget):
         self.tree.setHeaderHidden(True)
         self.tree.setUniformRowHeights(True)
         self.tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
-        # click selects; a second slow click on a selected row (or F2) renames
-        self.tree.setEditTriggers(QAbstractItemView.EditTrigger.EditKeyPressed
-                                  | QAbstractItemView.EditTrigger.SelectedClicked)
+        # click only selects; F2 (or the right-click menu) renames. No "slow second
+        # click" rename: its delayed timer fired after a double-click had already
+        # applied the theme and closed the popup, leaving a hidden editor behind.
+        self.tree.setEditTriggers(QAbstractItemView.EditTrigger.EditKeyPressed)
         self.tree.setExpandsOnDoubleClick(False)
-        self.tree.doubleClicked.connect(lambda idx: self.activate(idx))
+        # double-clicks are handled in eventFilter (not QAbstractItemView.doubleClicked,
+        # which Qt skips when the list was rebuilt between the two clicks)
         self.tree.selectionModel().selectionChanged.connect(lambda *_: self._update_actions())
         self.tree.setMouseTracking(True)
         self.tree.setDragEnabled(True)
@@ -523,7 +525,33 @@ class ThemeBrowser(QWidget):
                 self._press_pos = event_pos(event)
             elif et == QEvent.Type.MouseButtonRelease:
                 return self._viewport_release(event)
+            elif et == QEvent.Type.MouseButtonDblClick:
+                return self._viewport_double_click(event)
         return super().eventFilter(obj, event)
+
+    def _viewport_double_click(self, event):
+        if event.button() != Qt.MouseButton.LeftButton:
+            return False
+        pos = event_pos(event)
+        idx = self.tree.indexAt(pos)
+        if not idx.isValid() or not self.tree.visualRect(idx).contains(pos):
+            return False  # branch arrow / empty space: default behaviour
+        if self.tree.state() == QAbstractItemView.State.EditingState:
+            return False
+        self._press_pos = None
+        self.tree.setCurrentIndex(idx)
+        self.activate(idx, keep_open=self._ctrl(event))
+        return True
+
+    def cancel_editing(self):
+        """Close an open inline editor without committing (e.g. when the popup hides)."""
+        if self.tree.state() != QAbstractItemView.State.EditingState:
+            return
+        for editor in self.tree.findChildren(QLineEdit):
+            if editor.isVisible():
+                self.tree.closeEditor(editor, QAbstractItemDelegate.EndEditHint.RevertModelCache)
+        self._placeholder = None
+        self._group_keys = None
 
     def _visibility_shortcut(self, event):
         """Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z: undo / redo layer visibility."""
@@ -686,9 +714,12 @@ class ThemeBrowser(QWidget):
             self._add_move_menu(m, [key], exclude=folder)
             m.addAction(theme_icon("delete"), tr("Delete folder…") + "\tDel", lambda: self.delete_folder(folder))
             m.addSeparator()
-            m.addAction(theme_icon("expand"), tr("Expand all inside"), lambda: self._expand_recursive(idx, True))
+            # look the row up again when the action runs: the list may have been
+            # rebuilt while the menu was open, and an old index would crash Qt
+            m.addAction(theme_icon("expand"), tr("Expand all inside"),
+                        lambda: self._expand_recursive_key(key, True))
             m.addAction(theme_icon("collapse"), tr("Collapse all inside"),
-                        lambda: self._expand_recursive(idx, False))
+                        lambda: self._expand_recursive_key(key, False))
         else:
             self.tree.setCurrentIndex(self.model.index(-1, -1))
             m.addAction(theme_icon("theme-new"), tr("New theme from current layers"),
@@ -754,6 +785,11 @@ class ThemeBrowser(QWidget):
             build(sub, ())
         sub.addSeparator()
         sub.addAction(theme_icon("new-folder"), tr("New folder…"), lambda: self._move_to_new_folder(keys))
+
+    def _expand_recursive_key(self, key, expand):
+        item = self.model.items_by_key.get(tuple(key))
+        if item is not None:
+            self._expand_recursive(item.index(), expand)
 
     def _expand_recursive(self, idx, expand):
         self.tree.setExpanded(idx, expand)
