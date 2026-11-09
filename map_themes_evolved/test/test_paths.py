@@ -168,3 +168,33 @@ def test_compose():
 def test_unique_name():
     assert paths.unique_name("x", {"y"}) == "x"
     assert paths.unique_name("x", {"x", "x (2)"}) == "x (3)"
+
+
+# ---------------------------------------------------------------- custom order
+def test_order_key_listed_first_then_natural():
+    order = ["t:z", "t:b"]
+    items = ["a", "b", "z", "c10", "c2"]
+    got = sorted(items, key=lambda x: paths.order_key(order, "t:" + x, x))
+    assert got == ["z", "b", "a", "c2", "c10"]
+
+
+def test_reorder_within_same_parent():
+    kids = ["f:A", "f:B", "f:C"]
+    assert paths.reorder(kids, ["f:C"], 0) == ["f:C", "f:A", "f:B"]
+    assert paths.reorder(kids, ["f:A"], 3) == ["f:B", "f:C", "f:A"]
+    assert paths.reorder(kids, ["f:A"], 2) == ["f:B", "f:A", "f:C"]   # drop between B and C
+    assert paths.reorder(kids, ["f:A", "f:B"], -1) == ["f:C", "f:A", "f:B"]
+
+
+def test_reorder_from_elsewhere():
+    assert paths.reorder(["t:a", "t:b"], ["t:x"], 1) == ["t:a", "t:x", "t:b"]
+
+
+def test_remap_order_for_folder_move():
+    g = "\x1f"
+    order = {"": ["f:A", "f:B"], "A": ["t:x", "f:S"], g.join(["A", "S"]): ["t:y"]}
+    renamed = paths.remap_order_for_folder_move(order, ("A",), ("Z",))
+    assert renamed[""] == ["f:Z", "f:B"]
+    assert renamed["Z"] == ["t:x", "f:S"] and renamed[g.join(["Z", "S"])] == ["t:y"]
+    moved = paths.remap_order_for_folder_move(order, ("A",), ("B", "A"))
+    assert moved[""] == ["f:B"] and g.join(["B", "A"]) in moved

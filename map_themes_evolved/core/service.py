@@ -6,6 +6,8 @@ stays 100 % compatible with native QGIS.  Renames always use
 following a theme are updated by QGIS core itself.
 """
 
+import json
+
 from qgis.PyQt import sip
 from qgis.PyQt.QtCore import QObject, QTimer, pyqtSignal
 from qgis.core import QgsMapThemeCollection, QgsProject
@@ -13,6 +15,8 @@ from qgis.core import QgsMapThemeCollection, QgsProject
 from . import paths
 
 SCOPE = "MapThemesEvolved"
+TMP_PREFIX = "⁣mte-tmp-"
+ORDER_GLUE = "\x1f"  # same glue as ui.model.FOLDER_GLUE
 
 
 class ThemeService(QObject):
@@ -30,6 +34,8 @@ class ThemeService(QObject):
         self.session_folders = set()
         #: theme applied last (through any UI) — target for "Update"
         self.last_applied = None
+        #: custom order per folder key (see paths.reorder); saved in the project
+        self._order = {}
 
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
@@ -39,6 +45,7 @@ class ThemeService(QObject):
         self._project.mapThemeCollectionChanged.connect(self._attach_collection)
         self._project.readProject.connect(self._on_project_reset)
         self._project.cleared.connect(self._on_project_reset)
+        self._load_order()
         self._attach_collection()
 
     # ------------------------------------------------------------------
@@ -58,6 +65,19 @@ class ThemeService(QObject):
     def _follow_rename(self, old, new):
         if self.last_applied == old:
             self.last_applied = new
+        # keep a renamed theme's custom position (also for renames made elsewhere)
+        if old.startswith(TMP_PREFIX) or new.startswith(TMP_PREFIX):
+            return
+        sep = self.separator
+        of, nf = paths.folder_of(old, sep), paths.folder_of(new, sep)
+        lst = self._order.get(ORDER_GLUE.join(of))
+        entry = paths.theme_entry(paths.leaf_of(old, sep))
+        if lst and entry in lst:
+            if of == nf:
+                lst[lst.index(entry)] = paths.theme_entry(paths.leaf_of(new, sep))
+            else:
+                lst.remove(entry)
+            self._write_order()
 
     def _detach_collection(self):
         coll, self._collection = self._collection, None
@@ -77,6 +97,7 @@ class ThemeService(QObject):
     def _on_project_reset(self, *args):
         self.session_folders.clear()
         self.last_applied = None
+        self._load_order()
         self.projectReset.emit()
         self._schedule()
 
@@ -122,6 +143,41 @@ class ThemeService(QObject):
     def project_key(self):
         """Stable key for per-project UI state stored outside the project."""
         return self._project.absoluteFilePath() or "<unsaved>"
+
+    # ------------------------------------------------------------------
+    # custom order (project custom property "MapThemesEvolved/order")
+    # ------------------------------------------------------------------
+    def _load_order(self):
+        raw, ok = self._project.readEntry(SCOPE, "order", "")
+        try:
+            data = json.loads(raw) if ok and raw else {}
+        except ValueError:
+            data = {}
+        self._order = {str(k): [str(e) for e in v] for k, v in data.items() if isinstance(v, list)}
+
+    def _write_order(self):
+        self._order = {k: v for k, v in self._order.items() if v}
+        self._project.writeEntry(SCOPE, "order", json.dumps(self._order, ensure_ascii=False))
+
+    def order_for(self, folder):
+        return self._order.get(ORDER_GLUE.join(folder), [])
+
+    def set_order(self, folder, entries):
+        """Store a folder's custom child order. Returns the previous list (for undo)."""
+        key = ORDER_GLUE.join(folder)
+        previous = list(self._order.get(key, []))
+        if previous != list(entries):
+            self._order[key] = list(entries)
+            self._write_order()
+            self._schedule()
+        return previous
+
+    def move_folder_order(self, old, new):
+        """Carry a folder's (and its subfolders') custom order along a rename/move."""
+        if not self._order:
+            return
+        self._order = paths.remap_order_for_folder_move(self._order, tuple(old), tuple(new), ORDER_GLUE)
+        self._write_order()
 
     # ------------------------------------------------------------------
     # reading
@@ -259,7 +315,7 @@ class ThemeService(QObject):
             if set(mapping.values()) & set(mapping):
                 temps = {}
                 for i, old in enumerate(mapping):
-                    tmp = f"⁣mte-tmp-{i}-{old}"
+                    tmp = f"{TMP_PREFIX}{i}-{old}"
                     if not coll.renameMapTheme(old, tmp):
                         raise ValueError(f"Could not rename “{old}”.")
                     done.append((old, tmp))

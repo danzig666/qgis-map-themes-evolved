@@ -52,6 +52,7 @@ _THEME_ICONS = {
     "delete": (None, "symbologyRemove.svg"),
     "undo": (None, "mActionUndo.svg"),
     "history": (None, "mActionHistory.svg"),
+    "redo": (None, "mActionRedo.svg"),
     "panel": (None, "mDockify.svg"),
     "copy": (None, "mActionEditCopy.svg"),
     "pin": (None, "pin.svg"),
@@ -108,6 +109,9 @@ class Notifier:
             btn.clicked.connect(_undo)
             widget.layout().addWidget(btn)
         bar.pushWidget(widget, Qgis.MessageLevel.Info, 8)
+
+    def info(self, text):
+        self.iface.messageBar().pushMessage(PLUGIN_NAME, text, Qgis.MessageLevel.Info, 3)
 
     def error(self, text):
         self.iface.messageBar().pushMessage(PLUGIN_NAME, text, Qgis.MessageLevel.Warning, 6)

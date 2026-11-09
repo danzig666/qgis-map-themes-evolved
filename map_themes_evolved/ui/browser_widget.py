@@ -6,7 +6,9 @@ Interaction model
   so a stray click never changes the map.
 * Everything else is on the row itself: right-click menu, F2 / slow second click
   rename in place, Del delete, Ctrl+G group the selection, drag onto a folder to move.
-* The history button restores any of the last layer-visibility states.
+* **↶ / ↷ undo and redo layer visibility** (Ctrl+Z / Ctrl+Y) — the arrow next to ↶
+  lists the recent layer states to jump to. Undoing *theme edits* (rename, group,
+  delete…) is separate: the message bar's Undo link or ⋯ ▸ Undo last theme edit.
 * The status strip says which theme is active, or that the layers changed since
   a theme was applied, with one-click **Update** / **Save as new**.
 * New themes and folders are typed straight into the tree (no dialog).
@@ -106,8 +108,8 @@ class ThemeBrowser(QWidget):
 
         self.model = ThemeTreeModel(service, self)
         self.model.renameRequested.connect(self._on_edit_committed)
-        self.model.moveRequested.connect(lambda keys, folder: QTimer.singleShot(
-            0, lambda: self.move_items(keys, folder)))
+        self.model.moveRequested.connect(lambda keys, folder, row: QTimer.singleShot(
+            0, lambda: self.move_items(keys, folder, row)))
         self._build_ui()
         notifier.listeners.append(self._update_actions)
         service.themesChanged.connect(self._on_themes_changed)
@@ -171,16 +173,20 @@ class ThemeBrowser(QWidget):
         st.addWidget(self.btn_update)
         st.addWidget(self.btn_save_new)
         if self.history is not None:
-            self.btn_history = QToolButton(self.status)
-            self.btn_history.setIcon(theme_icon("history"))
-            self.btn_history.setAutoRaise(True)
-            self.btn_history.setToolTip(tr("Layer visibility history — go back to an earlier "
-                                           "state of the layer checkboxes"))
-            self.btn_history.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-            self.history_menu = QMenu(self.btn_history)
+            self.btn_vis_undo = QToolButton(self.status)
+            self.btn_vis_undo.setIcon(theme_icon("undo"))
+            self.btn_vis_undo.setAutoRaise(True)
+            self.btn_vis_undo.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
+            self.btn_vis_undo.clicked.connect(self.undo_visibility)
+            self.history_menu = QMenu(self.btn_vis_undo)
             self.history_menu.aboutToShow.connect(self._fill_history_menu)
-            self.btn_history.setMenu(self.history_menu)
-            st.addWidget(self.btn_history)
+            self.btn_vis_undo.setMenu(self.history_menu)
+            self.btn_vis_redo = QToolButton(self.status)
+            self.btn_vis_redo.setIcon(theme_icon("redo"))
+            self.btn_vis_redo.setAutoRaise(True)
+            self.btn_vis_redo.clicked.connect(self.redo_visibility)
+            st.addWidget(self.btn_vis_undo)
+            st.addWidget(self.btn_vis_redo)
             self.history.changed.connect(self._on_history_changed)
             self._on_history_changed()
         lay.addWidget(self.status)
@@ -226,7 +232,8 @@ class ThemeBrowser(QWidget):
                                           lambda: self.start_new_theme())
         self.act_new_folder = self._action("new-folder", tr("New folder"), tr("New folder"),
                                            lambda: self.start_new_folder())
-        self.act_undo = self._action("undo", tr("Undo"), tr("Undo last theme change"),
+        self.act_undo = self._action("undo", tr("Undo last theme edit"),
+                                     tr("Undo the last rename / move / group / delete…"),
                                      self.notifier.undo_op)
         self.act_panel = self._action("panel", tr("Open as panel"),
                                       tr("Open the theme browser as a docked panel"),
@@ -244,7 +251,6 @@ class ThemeBrowser(QWidget):
         self.group_button = self._tool_button(self.act_group, True)
         row1.addWidget(self.group_button)
         row1.addStretch(1)
-        row1.addWidget(self._tool_button(self.act_undo))
         if self.host is not None:
             row1.addWidget(self._tool_button(self.act_panel))
         more = QToolButton(self)
@@ -253,6 +259,8 @@ class ThemeBrowser(QWidget):
         more.setToolTip(tr("More"))
         more.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         more_menu = QMenu(more)
+        more_menu.addAction(self.act_undo)
+        more_menu.addSeparator()
         if self.classic_menu is not None:
             more_menu.addAction(tr("Classic QGIS map themes menu"), self._open_classic_menu)
         more_menu.addAction(theme_icon("expand"), tr("Expand all folders"), self._expand_all)
@@ -511,8 +519,26 @@ class ThemeBrowser(QWidget):
                 return self._viewport_release(event)
         return super().eventFilter(obj, event)
 
+    def _visibility_shortcut(self, event):
+        """Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z: undo / redo layer visibility."""
+        mods = event.modifiers()
+        if not mods & Qt.KeyboardModifier.ControlModifier:
+            return False
+        if event.key() == Qt.Key.Key_Z:
+            if mods & Qt.KeyboardModifier.ShiftModifier:
+                self.redo_visibility()
+            else:
+                self.undo_visibility()
+            return True
+        if event.key() == Qt.Key.Key_Y:
+            self.redo_visibility()
+            return True
+        return False
+
     def _search_key(self, event):
         key = event.key()
+        if not self.search.text() and self._visibility_shortcut(event):
+            return True
         if key in _NAV_KEYS:
             if not self.selected_index() and self.model.rowCount():
                 self.tree.setCurrentIndex(self.model.index(0, 0))
@@ -543,6 +569,8 @@ class ThemeBrowser(QWidget):
             return True
         if key == Qt.Key.Key_G and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             self.group_selected()
+            return True
+        if self._visibility_shortcut(event):
             return True
         if key == Qt.Key.Key_Escape:
             if self.search.text():
@@ -938,32 +966,54 @@ class ThemeBrowser(QWidget):
     # layer visibility history
     # ------------------------------------------------------------------
     def _on_history_changed(self):
-        self.btn_history.setEnabled(self.history.previous() is not None)
+        h = self.history
+        back = h.undo_entry()
+        self.btn_vis_undo.setEnabled(bool(h.entries))
+        self.btn_vis_undo.setToolTip(
+            tr("Undo layer visibility change (Ctrl+Z)\nBack to: {}").format(back.label) if back
+            else tr("No earlier layer visibility to go back to.\nThe arrow shows the history."))
+        fwd = h.entries[h.index + 1] if 0 <= h.index < len(h.entries) - 1 else None
+        self.btn_vis_redo.setEnabled(fwd is not None)
+        self.btn_vis_redo.setToolTip(
+            tr("Redo layer visibility change (Ctrl+Y)\nForward to: {}").format(fwd.label) if fwd
+            else tr("Nothing to redo"))
+        if self.isVisible():
+            self.refresh()
+
+    def undo_visibility(self):
+        if self.history is None:
+            return
+        entry = self.history.undo()
+        if entry is None:
+            self.notifier.info(tr("No earlier layer visibility to go back to."))
+
+    def redo_visibility(self):
+        if self.history is not None:
+            self.history.redo()
 
     def _fill_history_menu(self):
         m = self.history_menu
         m.clear()
-        entries = self.history.entries
-        if len(entries) < 2:
-            a = m.addAction(tr("No earlier layer states yet"))
+        h = self.history
+        h.flush()
+        if len(h.entries) < 2:
+            a = m.addAction(tr("No layer visibility changes yet"))
             a.setEnabled(False)
             return
-        head = m.addAction(tr("Layer visibility history (newest first)"))
+        head = m.addAction(tr("Layer visibility history — click to go back"))
         head.setEnabled(False)
         m.addSeparator()
-        now = m.addAction(theme_icon("theme-current"), tr("Now — {}").format(entries[0].label))
-        now.setEnabled(False)
-        for i, entry in enumerate(entries[1:], start=1):
+        for i in range(len(h.entries) - 1, -1, -1):  # newest first
+            entry = h.entries[i]
             text = f"{entry.time_text()}   {entry.label}"
-            if i == 1:
-                text += "\t" + tr("previous")
-            a = m.addAction(theme_icon("undo") if i == 1 else theme_icon("history"), text)
-            a.triggered.connect(lambda _c=False, e=entry: self._restore_history(e))
-
-    def _restore_history(self, entry):
-        self.history.restore(entry)
-        self.notifier.done(tr("Layer visibility restored to {} ({}).").format(entry.time_text(), entry.label))
-        self.refresh()
+            if i == h.index:
+                a = m.addAction(theme_icon("theme-current"), f"{text}\t{tr('now')}")
+                f = a.font()
+                f.setBold(True)
+                a.setFont(f)
+            else:
+                a = m.addAction(theme_icon("undo") if i < h.index else theme_icon("redo"), text)
+                a.triggered.connect(lambda _c=False, j=i: self.history.go_to(j))
 
     def delete_themes(self, names, label=None):
         removed = self.service.remove(names)
@@ -999,28 +1049,34 @@ class ThemeBrowser(QWidget):
             self._drop_session_folders(folder)
             self.refresh()
 
-    def move_items(self, keys, target):
-        """Move themes and/or folders into ``target`` (drag & drop, Move to menu)."""
+    def move_items(self, keys, target, row=None):
+        """Move themes and/or folders into ``target``; with ``row``, also place them there.
+
+        Used by drag & drop (dropping between rows reorders), Move to and Group.
+        Dropping inside the same folder only changes the custom order.
+        """
         target = tuple(target)
         sep, spaced = self.service.separator, self.service.spaced
-        theme_map, folder_moves = {}, []
+        theme_map, folder_moves, moved_entries = {}, [], []
         for kind, val in keys:
             if kind == "theme":
                 theme_map[val] = paths.plan_move(val, target, sep, spaced)
+                moved_entries.append(paths.theme_entry(paths.leaf_of(val, sep)))
             elif kind == "folder":
                 f = key_to_folder(val)
                 if paths.is_subfolder(target, f):
-                    if target != f[:-1]:
-                        self.notifier.error(tr("A folder cannot be moved into itself."))
+                    self.notifier.error(tr("A folder cannot be moved into itself."))
                     return
-                folder_moves.append((f, target + (f[-1],)))
+                if target != f[:-1]:
+                    folder_moves.append((f, target + (f[-1],)))
+                moved_entries.append(paths.folder_entry(f[-1]))
+        theme_map = {o: n for o, n in theme_map.items() if o != n}
+        children = self.model.child_entries(target) if row is not None and row >= 0 else None
         try:
             if folder_moves:
                 self._move_folders(folder_moves, tr("Moved"), extra=theme_map, target=target)
             elif theme_map:
                 applied = self.service.rename_many(theme_map)
-                if not applied:
-                    return
                 self._discard_session_folder(target)
                 inverse = {v: k for k, v in applied.items()}
                 op = self.undo.push(tr("move to “{}”").format(self._folder_label(target)),
@@ -1032,6 +1088,15 @@ class ThemeBrowser(QWidget):
                     len(applied), self._folder_label(target)), op)
         except ValueError as e:
             self.notifier.error(str(e))
+            self.refresh()
+            return
+        if children is not None:
+            previous = self.service.set_order(target, paths.reorder(children, moved_entries, row))
+            if not folder_moves and not theme_map:
+                # pure reorder inside one folder
+                self.undo.push(tr("reorder"), lambda: self.service.set_order(target, previous))
+                if len(keys) == 1:
+                    self._pending_key = tuple(keys[0])
         self.refresh()
 
     def _move_folders(self, moves, verb, extra=None, target=None):
@@ -1040,7 +1105,15 @@ class ThemeBrowser(QWidget):
         mapping = dict(extra or {})
         for old, new in moves:
             mapping.update(paths.plan_folder_rename(names, old, new, sep, spaced))
-        applied = self.service.rename_many(mapping)  # raises ValueError on conflicts
+        # move the custom order first, so per-theme rename tracking finds nothing stale
+        for old, new in moves:
+            self.service.move_folder_order(old, new)
+        try:
+            applied = self.service.rename_many(mapping)  # raises ValueError on conflicts
+        except ValueError:
+            for old, new in reversed(moves):
+                self.service.move_folder_order(new, old)
+            raise
         for old, new in moves:
             self._move_session_folders(old, new)
             ok, nk = folder_to_key(old), folder_to_key(new)
@@ -1056,6 +1129,8 @@ class ThemeBrowser(QWidget):
             undo_moves = [(new, old) for old, new in moves]
 
             def _undo():
+                for o, n in undo_moves:
+                    self.service.move_folder_order(o, n)
                 self.service.rename_many(inverse)
                 for o, n in undo_moves:
                     self._move_session_folders(o, n)

@@ -41,7 +41,7 @@ A QGIS plugin that replaces the eye-icon "Manage Map Themes" menu with a searcha
 2. **Names are only changed when you rename or move something.** Opening, browsing or searching never writes.
 3. **Rename and move go through `renameMapTheme(old, new)`.** Never remove + insert.
 4. **Replace goes through `update(name, record)`**, using `QgsMapThemeCollection.createThemeFromCurrentState(root, model)` exactly like native.
-5. **Project file:** the plugin may write only UI state (expanded folders, separator choice) as project custom properties (`QgsProject.writeEntry("MapThemesEvolved", …)`). QGIS ignores these entries.
+5. **Project file:** the plugin writes only its own project custom properties (`QgsProject.writeEntry("MapThemesEvolved", …)`): the custom folder/theme order and the separator choice. QGIS ignores these entries. Expanded folders and window geometry go to QgsSettings.
 6. **Live sync:** themes changed by native UI, scripts or other plugins show up immediately (via `mapThemesChanged`, `mapThemeRenamed`, `mapThemeChanged`, `QgsProject.readProject` and `cleared`).
 7. **Clean unload:** restore the original menu and popup mode on the eye button. Disconnect every signal. Hook and unhook can safely run more than once (Plugin Reloader safe).
 8. **Native menu always reachable:** "Classic menu…" entry in the popup, plus an optional setting: right-click on the eye button opens the native menu.

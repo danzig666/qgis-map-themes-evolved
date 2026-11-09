@@ -188,6 +188,62 @@ def unique_name(name, existing):
 
 
 # --------------------------------------------------------------------------
+# custom order
+# --------------------------------------------------------------------------
+# A folder's custom order is a list of entries: "f:<folder segment>" for
+# subfolders and "t:<theme leaf>" for themes. Children missing from the list
+# come after the listed ones, in natural order. Folders stay above themes.
+
+def folder_entry(segment):
+    return "f:" + segment
+
+
+def theme_entry(leaf):
+    return "t:" + leaf
+
+
+def order_key(order, entry, text):
+    """Sort key placing listed entries first, in list order."""
+    try:
+        return (0, order.index(entry), natural_key(text))
+    except ValueError:
+        return (1, 0, natural_key(text))
+
+
+def reorder(children, moved, row):
+    """Visible child entries with ``moved`` inserted before visible row ``row``.
+
+    ``children`` is the target folder's current visual order; ``moved`` may
+    come from this folder or from elsewhere.
+    """
+    if row is None or row < 0:
+        row = len(children)
+    before = sum(1 for c in children[:row] if c in moved)
+    rest = [c for c in children if c not in moved]
+    pos = max(0, min(len(rest), row - before))
+    return rest[:pos] + list(moved) + rest[pos:]
+
+
+def remap_order_for_folder_move(order, old, new, glue="\x1f"):
+    """Custom order after folder ``old`` became ``new`` (keys are glue-joined paths)."""
+    old_k, new_k = glue.join(old), glue.join(new)
+    result = {}
+    for k, lst in order.items():
+        if k == old_k or k.startswith(old_k + glue):
+            k = new_k + k[len(old_k):]
+        result[k] = list(lst)
+    parent_old, parent_new = glue.join(old[:-1]), glue.join(new[:-1])
+    entry_old, entry_new = folder_entry(old[-1]), folder_entry(new[-1])
+    if entry_old in result.get(parent_old, []):
+        lst = result[parent_old]
+        if parent_old == parent_new:
+            lst[lst.index(entry_old)] = entry_new
+        else:
+            lst.remove(entry_old)
+    return result
+
+
+# --------------------------------------------------------------------------
 # validation
 # --------------------------------------------------------------------------
 

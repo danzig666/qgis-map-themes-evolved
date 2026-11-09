@@ -15,7 +15,7 @@ from qgis.PyQt.QtCore import QObject, QTimer, pyqtSignal
 
 from . import paths
 
-HISTORY_LIMIT = 15
+HISTORY_LIMIT = 30
 _LABEL_NAMES = 3
 
 
@@ -51,7 +51,12 @@ class VisibilityHistory(QObject):
         super().__init__(parent)
         self.service = service
         self.limit = limit
-        self.entries = []  # newest first; entries[0] is the current state
+        #: chronological, oldest first; ``index`` points at the current state.
+        #: Undo/redo move the pointer; a new manual change drops the redo part
+        #: (exactly like undo in an editor).
+        self.entries = []
+        self.index = -1
+        self._applying = False
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.setInterval(delay_ms)
@@ -69,44 +74,82 @@ class VisibilityHistory(QObject):
             pass
 
     def _schedule(self, *args):
-        self._timer.start()
+        if not self._applying:
+            self._timer.start()
 
     def _on_project_reset(self):
         self.entries = []
+        self.index = -1
         self._timer.start()  # new baseline once the project has loaded
         self.changed.emit()
 
     # ------------------------------------------------------------------
+    @property
+    def current(self):
+        return self.entries[self.index] if 0 <= self.index < len(self.entries) else None
+
+    def can_undo(self):
+        self.flush()
+        return self.index > 0
+
+    def can_redo(self):
+        self.flush()
+        return 0 <= self.index < len(self.entries) - 1
+
+    def flush(self):
+        """Capture a pending change right now (e.g. before undoing)."""
+        if self._timer.isActive():
+            self._timer.stop()
+            self.capture()
+
     def capture(self):
-        """Record the current state unless it is already the newest entry."""
+        """Record the current layer state if it differs from the current entry."""
         try:
             record = self.service.current_record()
         except Exception:  # noqa: BLE001 — never break the UI over history
             return
         key = state_key(record)
-        for i, entry in enumerate(self.entries):
-            if entry.key == key:
-                if i:  # went back to an older state: move it to the top
-                    self.entries.insert(0, self.entries.pop(i))
-                    entry.when = time.time()
-                    theme = self._theme_label(record)
-                    if theme:
-                        entry.label = theme
-                    self.changed.emit()
-                return
+        cur = self.current
+        if cur is not None and cur.key == key:
+            return
         label = self._label(record, key)
-        self.entries.insert(0, HistoryEntry(record, key, label))
-        del self.entries[self.limit:]
+        del self.entries[self.index + 1:]  # a new change discards the redo steps
+        self.entries.append(HistoryEntry(record, key, label))
+        overflow = len(self.entries) - self.limit
+        if overflow > 0:
+            del self.entries[:overflow]
+        self.index = len(self.entries) - 1
         self.changed.emit()
 
-    def restore(self, entry):
-        self.service.apply_record(entry.record)
-        self._timer.stop()
-        self.capture()
+    def undo(self):
+        """Go back one layer-visibility step. Returns the entry now shown, or None."""
+        if not self.can_undo():
+            return None
+        return self.go_to(self.index - 1)
 
-    def previous(self):
-        """The state before the current one, if any."""
-        return self.entries[1] if len(self.entries) > 1 else None
+    def redo(self):
+        if not self.can_redo():
+            return None
+        return self.go_to(self.index + 1)
+
+    def go_to(self, i):
+        self.flush()
+        if not 0 <= i < len(self.entries):
+            return None
+        entry = self.entries[i]
+        self._applying = True
+        try:
+            self.service.apply_record(entry.record)
+        finally:
+            self._applying = False
+        self._timer.stop()
+        self.index = i
+        self.changed.emit()
+        return entry
+
+    def undo_entry(self):
+        """The entry Undo would go back to (for tooltips)."""
+        return self.entries[self.index - 1] if self.index > 0 else None
 
     # ------------------------------------------------------------------
     def _theme_label(self, record):
@@ -122,7 +165,7 @@ class VisibilityHistory(QObject):
             return theme
         if not self.entries:
             return "Start"
-        old_layers, old_groups = self.entries[0].key
+        old_layers, old_groups = self.current.key
         new_layers, new_groups = key
         old_ids = {lid for lid, _ in old_layers}
         new_ids = {lid for lid, _ in new_layers}

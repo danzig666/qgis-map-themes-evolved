@@ -56,7 +56,11 @@ class MapThemesEvolvedPlugin:
         panel.setText(tr("Map Themes Panel"))
         panel.setIcon(theme_icon("panel"))
         self.iface.addPluginToMenu(PLUGIN_NAME, panel)
-        self._add_action(theme_icon("undo"), tr("Undo Last Map Theme Change"),
+        self._add_action(theme_icon("undo"), tr("Undo Layer Visibility Change"),
+                         lambda: self.history.undo(), "MapThemesEvolvedVisibilityUndo")
+        self._add_action(theme_icon("redo"), tr("Redo Layer Visibility Change"),
+                         lambda: self.history.redo(), "MapThemesEvolvedVisibilityRedo")
+        self._add_action(theme_icon("history"), tr("Undo Last Map Theme Edit"),
                          lambda: self.notifier.undo_op(), "MapThemesEvolvedUndo")
         if hooked:
             self._add_action(QIcon(), tr("Classic Map Themes Menu"), self.hook.show_original_menu,

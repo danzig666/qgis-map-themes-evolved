@@ -16,9 +16,10 @@ Click the **eye button** in the Layers panel.
 - **Right-click** a theme or folder for everything else: update, rename, **Move to ▸**, duplicate, copy name, delete, and new theme or subfolder here.
 - **Drag** themes or folders onto a folder to move them, or onto empty space to move them to the top level.
 - **Group:** select several themes, then press **Group…** (or Ctrl+G, or right-click) to put them into a new or existing folder in one step.
-- **History** (clock button): the last 15 layer-visibility states, newest first. One click takes the layers back to any of them, so an accidental *Hide All* or a mis-click in the Layers panel is easy to undo. Your saved themes aren't touched.
+- **Undo layer visibility:** the **↶** button next to the status line (or **Ctrl+Z**) steps the layer checkboxes back one change, and **↷** (Ctrl+Y) redoes. This undoes an accidental *Hide All*, a mis-click in the Layers panel, or applying the wrong theme. The **▾** arrow lists the last 30 states (e.g. "Hidden: roads", "Theme “X”") to jump to directly. Your saved themes are never changed by this. The actions are also in *Plugins ▸ Map Themes Evolved*, where you can give them global shortcuts.
+- **Reorder:** drag a folder or theme *between* rows to put it there. Dropping *onto* a folder moves the item into it. The custom order is saved in the project (see Compatibility); anything you haven't placed keeps natural sorting. Folders stay above themes.
 - **New theme** and **New folder** add a row you type the name into. Type `Area/Topic/Name` to create subfolders on the fly.
-- Every change can be **undone**: use the message bar's *Undo*, the ↶ button, or *Plugins ▸ Map Themes Evolved*.
+- **Theme edits** (rename, move, group, delete, reorder…) can be undone from the message bar's *Undo* link or *⋯ ▸ Undo last theme edit*.
 - **Open as panel** (window icon) docks the same browser beside the map, which is handy for longer organising sessions.
 - **Window position:** drag the popup by its title bar and it reopens there. Double-click the title bar to put it back under the eye button. The popup and panel positions are saved in your QGIS settings, not the project. If a monitor is unplugged or the resolution changes, they're moved back onto a visible screen.
 - The **Layers:** row holds QGIS's own Show All / Hide All / Show Selected… actions, unchanged.
@@ -32,6 +33,7 @@ Click the **eye button** in the Layers panel.
 | Ctrl+Enter, middle-click | apply theme and keep the list open (or use 📌) |
 | Ctrl/Shift+click | select several |
 | Ctrl+G | group the selection into a folder |
+| Ctrl+Z / Ctrl+Y | undo / redo layer visibility |
 | F2, or a slow second click | rename in place |
 | Del | delete the selection (can be undone) |
 | Esc | clear the search, then close |
@@ -42,7 +44,8 @@ You can assign a shortcut to *Browse Map Themes…* in *Settings ▸ Keyboard Sh
 
 - Reads and writes only through QGIS's own map-theme API (`QgsMapThemeCollection`).
 - Renames use `renameMapTheme`, so **print layouts that follow a theme are updated by QGIS itself**. Data-defined theme expressions are *not* updated by QGIS. Check those after renaming.
-- Remembered folder open/closed state lives in your QGIS settings, never in the project file.
+- The only extra thing stored in the project is your **custom order**, as a project property (`MapThemesEvolved/order`), and only once you reorder something. QGIS without the plugin ignores it.
+- Folder open/closed state, window positions and the layer visibility history are never stored in the project. The first two are in your QGIS settings; the history lasts only for the session.
 - Disabling the plugin restores the original eye-button menu immediately.
 
 Tested on QGIS 3.44 (Qt5). It's written to also work on QGIS 4.x (Qt6), but that hasn't been tested yet.

@@ -46,8 +46,8 @@ def item_key(index_or_item):
 class ThemeTreeModel(QStandardItemModel):
     #: (key, new text typed by the user)
     renameRequested = pyqtSignal(object, str)
-    #: (list of keys, target folder tuple)
-    moveRequested = pyqtSignal(object, object)
+    #: (list of keys, target folder tuple, row in target or -1 = append)
+    moveRequested = pyqtSignal(object, object, int)
 
     def __init__(self, service, parent=None):
         super().__init__(parent)
@@ -115,9 +115,12 @@ class ThemeTreeModel(QStandardItemModel):
             keys = [tuple(k) for k in json.loads(bytes(data.data(MIME_TYPE)).decode("utf-8"))]
         except (ValueError, TypeError):
             return False
+        if parent.isValid() and parent.data(KIND_ROLE) == "theme":
+            # dropped onto a theme: place before it, in that theme's folder
+            row, parent = parent.row(), parent.parent()
         target = self.folder_for_drop(parent)
         if keys:
-            self.moveRequested.emit(keys, target)
+            self.moveRequested.emit(keys, target, row)
         return False  # never let the view remove rows itself
 
     def folder_for_drop(self, parent):
@@ -126,9 +129,26 @@ class ThemeTreeModel(QStandardItemModel):
         kind = parent.data(KIND_ROLE)
         if kind == "folder":
             return key_to_folder(parent.data(PATH_ROLE))
-        if kind == "theme":  # dropped onto a theme: use that theme's folder
-            return paths.folder_of(parent.data(NAME_ROLE), self.service.separator)
         return ()
+
+    def child_entries(self, folder):
+        """Current visual order of a folder's children as order entries."""
+        sep = self.service.separator
+        if folder:
+            item = self.items_by_key.get(("folder", folder_to_key(folder)))
+            if item is None:
+                return []
+        else:
+            item = self.invisibleRootItem()
+        entries = []
+        for r in range(item.rowCount()):
+            ch = item.child(r)
+            kind = ch.data(KIND_ROLE)
+            if kind == "folder":
+                entries.append(paths.folder_entry(ch.text()))
+            elif kind == "theme":
+                entries.append(paths.theme_entry(paths.leaf_of(ch.data(NAME_ROLE), sep)))
+        return entries
 
     # ------------------------------------------------------------------
     # building
@@ -191,9 +211,10 @@ class ThemeTreeModel(QStandardItemModel):
         item.setDropEnabled(kind == "folder")
 
     def _fill(self, parent_item, node, folder, current, modified, marked_folders, placeholder):
+        order = self.service.order_for(folder)
         if placeholder and placeholder[0] == "new-folder" and tuple(placeholder[1]) == folder:
             self._add_placeholder(parent_item, placeholder)
-        for seg in sorted(node["folders"], key=paths.natural_key):
+        for seg in sorted(node["folders"], key=lambda sg: paths.order_key(order, paths.folder_entry(sg), sg)):
             path = folder + (seg,)
             it = QStandardItem(theme_icon("folder"), seg)
             it.setData("folder", KIND_ROLE)
@@ -206,7 +227,8 @@ class ThemeTreeModel(QStandardItemModel):
             self._fill(it, node["folders"][seg], path, current, modified, marked_folders, placeholder)
         if placeholder and placeholder[0] == "new-theme" and tuple(placeholder[1]) == folder:
             self._add_placeholder(parent_item, placeholder)
-        for leaf, name in sorted(node["themes"], key=lambda ln: paths.natural_key(ln[0])):
+        for leaf, name in sorted(node["themes"],
+                                 key=lambda ln: paths.order_key(order, paths.theme_entry(ln[0]), ln[0])):
             if name in current:
                 ic = theme_icon("theme-current")
             elif name == modified:
