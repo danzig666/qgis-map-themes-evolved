@@ -4,7 +4,7 @@
 
 A QGIS plugin that turns the eye button in the Layers panel ("Manage Map Themes") into a searchable, folder-based theme browser. It stays fully compatible with native QGIS map themes.
 
-Folders are just part of the theme name: `Debrecen/Land use/Residential` shows up as `Residential` in the folders `Debrecen ▸ Land use`. Nothing else is stored, so a project opened without the plugin behaves exactly as before. You just see the full names in the flat list.
+Folders are just part of the theme name: `Riverton/Land use/Residential` shows up as `Residential` in the folders `Riverton ▸ Land use`. Nothing else is stored, so a project opened without the plugin behaves exactly as before. You just see the full names in the flat list.
 
 <p align="center"><img src="docs/screenshots/overview.png" width="430" alt="The Map Themes popup: folders, the active theme marked, Apply / New theme / New folder"></p>
 

@@ -1,7 +1,7 @@
 """Pure-Python helpers for folder-style map theme names.
 
-A theme called ``Debrecen/Land use/Residential`` is shown as the theme
-``Residential`` inside the folders ``Debrecen`` > ``Land use``.  Nothing here
+A theme called ``Riverton/Land use/Residential`` is shown as the theme
+``Residential`` inside the folders ``Riverton`` > ``Land use``.  Nothing here
 imports QGIS, so the logic can be unit-tested with plain pytest.
 
 Folder paths are represented as tuples of segment strings, ``()`` being the

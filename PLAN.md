@@ -8,7 +8,7 @@ A QGIS plugin that replaces the eye-icon "Manage Map Themes" menu with a searcha
 
 **Goals**
 1. Find any theme in under 2 seconds: open the eye menu, type a few letters, press Enter.
-2. Organise themes in nested folders using only theme names (`Debrecen/Land use/Residential`).
+2. Organise themes in nested folders using only theme names (`Riverton/Land use/Residential`).
 3. 100 % compatible with native QGIS: same project file, same theme records, same behaviour when the plugin is off.
 4. Keep every native function (show/hide layer actions, Add, Replace, Rename, Remove, apply). Native actions stay one click away, not buried.
 5. Degrade gracefully: if a future QGIS changes the eye button, the plugin still works through its dock panel and locator. It never breaks QGIS.
@@ -51,8 +51,8 @@ A QGIS plugin that replaces the eye-icon "Manage Map Themes" menu with a searcha
 ## 4. Naming model
 
 ```
-Debrecen/Land use/Residential   →  Debrecen ▸ Land use ▸ Residential
-Debrecen / Transport / Roads    →  Debrecen ▸ Transport ▸ Roads   (spaces around separator tolerated)
+Riverton/Land use/Residential   →  Riverton ▸ Land use ▸ Residential
+Riverton / Transport / Roads    →  Riverton ▸ Transport ▸ Roads   (spaces around separator tolerated)
 Overview                        →  Overview (root)
 ```
 
@@ -72,12 +72,12 @@ Overview                        →  Overview (root)
 ┌──────────────────────────────────────────┐
 │ 🔍 Search themes…              [⚙]      │  ← focused on open
 ├──────────────────────────────────────────┤
-│ ▾ 📁 Debrecen                            │
+│ ▾ 📁 Riverton                            │
 │    ▾ 📁 Land use                         │
 │        ● Residential          ← current  │
 │          Industrial                      │
 │    ▸ 📁 Transport                        │
-│ ▸ 📁 Hortobágy                           │
+│ ▸ 📁 Lakeside                            │
 │   Overview                               │
 ├──────────────────────────────────────────┤
 │ [+ Add] [⟳ Replace] [✎ Rename] [🗑]      │  ← act on selection / current
@@ -87,7 +87,7 @@ Overview                        →  Overview (root)
 ```
 
 - **Opening:** clicking the eye opens the popup. It remembers its size, keeps folders expanded as you left them and scrolls to the current theme.
-- **Search:** filters as you type over the *full path*. Words can be in any order (`deb res` matches `Debrecen/Land use/Residential`). Matches are highlighted and their parents expanded. Matches in the theme's own name rank above matches in folder names only. Prefix `layer:` searches for themes where a matching layer is visible.
+- **Search:** filters as you type over the *full path*. Words can be in any order (`riv res` matches `Riverton/Land use/Residential`). Matches are highlighted and their parents expanded. Matches in the theme's own name rank above matches in folder names only. Prefix `layer:` searches for themes where a matching layer is visible.
 - **Keyboard:** ↑/↓ move through results while focus stays in the search box. Enter applies the theme (top match if nothing is selected). Ctrl+Enter applies and keeps the popup open. Esc clears the search first, then closes. F2 renames, Del deletes.
 - **Mouse:** a single click applies the theme and closes the popup (like native). A setting can change this to double-click. A middle-click or the pin icon applies without closing, for flipping through themes.
 - **Current theme:** marked with ● when the layer tree matches the theme exactly (same comparison native uses). A folder shows a small dot when it contains the current theme.
@@ -202,7 +202,7 @@ Dock panel and drag and drop are done (see above). Still open:
 - "Move to folder…" and "Duplicate"
 
 ### Phase 3 — Polish and release (v0.3 → 1.0)
-- **"Organise existing themes" wizard:** turn existing naming into folders, with a preview table of old → new names, applied as one undoable rename batch. Real projects already group with ` - ` (`Vizsgálat - Telekméretek`, `Tervezési terület - Donovár`) while codes contain a bare `-` (`MTrT-1`, `OTrT-10`). So the wizard must split only on the *spaced* form ` - `. It should also offer "group by common prefix" (`MTrT-*` → `MTrT/…`, `2025 *` → `2025/…`). Move this wizard to **v0.2**: it's the fastest way to get value from an existing project.
+- **"Organise existing themes" wizard:** turn existing naming into folders, with a preview table of old → new names, applied as one undoable rename batch. Real projects already group with ` - ` (`Vizsgálat - Telekméretek`, `Tervezési terület - Lakeside`) while codes contain a bare `-` (`MTrT-1`, `OTrT-10`). So the wizard must split only on the *spaced* form ` - `. It should also offer "group by common prefix" (`MTrT-*` → `MTrT/…`, `2025 *` → `2025/…`). Move this wizard to **v0.2**: it's the fastest way to get value from an existing project.
 - hide numeric prefixes and folders-first options
 - Hungarian translation, docs, screenshots, GIF
 - publish to plugins.qgis.org (flag Qt6 support)
@@ -211,7 +211,7 @@ Dock panel and drag and drop are done (see above). Still open:
 
 ## 8. Testing
 
-- **Unit tests (no QGIS):** `paths.py` — parsing, round-trips, validation, sorting, edge cases (`A//B`, `/A`, `A/`, unicode `Hortobágy`, case clashes).
+- **Unit tests (no QGIS):** `paths.py` — parsing, round-trips, validation, sorting, edge cases (`A//B`, `/A`, `A/`, unicode `Árvízvédelem`, case clashes).
 - **Integration tests (`qgis.testing`):** the service against a real project: add, rename and move keep records identical; layout maps follow renames; undo restores records byte-for-byte; signals refresh the model.
 - **CI matrix:** Docker images `qgis/qgis:3.44` (Qt5) and `qgis/qgis:latest` (Qt6) via GitHub Actions.
 - **Manual checklist per release:**

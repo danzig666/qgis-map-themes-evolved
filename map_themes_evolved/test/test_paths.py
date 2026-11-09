@@ -24,7 +24,7 @@ _spec.loader.exec_module(paths)
     ("A//B", ["A", "B"]),
     ("/A/", ["A"]),
     ("///", ["///"]),
-    ("Hortobágy/Táj", ["Hortobágy", "Táj"]),
+    ("Árvízvédelem/Táj", ["Árvízvédelem", "Táj"]),
 ])
 def test_split(name, expected):
     assert paths.split_path(name) == expected
@@ -79,15 +79,15 @@ def test_natural_sort_numbers_first_and_total():
 
 # ---------------------------------------------------------------- search
 def test_match_any_order_and_accents():
-    t = paths.query_tokens("res deb")
-    assert paths.match_score(t, "Debrecen/Land use/Residential") is not None
-    assert paths.match_score(paths.query_tokens("atnez"), "Átnézeti - donovár") is not None
-    assert paths.match_score(paths.query_tokens("xyz"), "Debrecen/Residential") is None
+    t = paths.query_tokens("res riv")
+    assert paths.match_score(t, "Riverton/Land use/Residential") is not None
+    assert paths.match_score(paths.query_tokens("atnez"), "Átnézeti - Lakeside") is not None
+    assert paths.match_score(paths.query_tokens("xyz"), "Riverton/Residential") is None
 
 
 def test_match_prefers_leaf():
     t = paths.query_tokens("transport")
-    leaf = paths.match_score(t, "Debrecen/Transport")
+    leaf = paths.match_score(t, "Riverton/Transport")
     folder = paths.match_score(t, "Transport/Roads")
     assert leaf > folder
 
