@@ -34,7 +34,7 @@ Click the **eye button** in the Layers panel.
 | Ctrl/Shift+click | select several |
 | Ctrl+G | group the selection into a folder |
 | Ctrl+Z / Ctrl+Y | undo / redo layer visibility |
-| F2, or a slow second click | rename in place |
+| F2 (or right-click ▸ Rename) | rename in place |
 | Del | delete the selection, no confirmation box (Undo brings it back) |
 | Esc | clear the search, then close |
 
