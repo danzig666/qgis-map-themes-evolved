@@ -192,7 +192,8 @@ def unique_name(name, existing):
 # --------------------------------------------------------------------------
 # A folder's custom order is a list of entries: "f:<folder segment>" for
 # subfolders and "t:<theme leaf>" for themes. Children missing from the list
-# come after the listed ones, in natural order. Folders stay above themes.
+# come after the listed ones (unplaced folders first, then themes, each in
+# natural order). Listed folders and themes can be mixed freely.
 
 def folder_entry(segment):
     return "f:" + segment

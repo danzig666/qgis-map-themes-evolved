@@ -15,9 +15,9 @@ Click the **eye button** in the Layers panel.
 - The **status line** shows the active theme. If you changed layers since applying a theme, it says so and offers **Update** (overwrite that theme) and **Save as new…**.
 - **Right-click** a theme or folder for everything else: update, rename, **Move to ▸**, duplicate, copy name, delete, and new theme or subfolder here.
 - **Drag** themes or folders onto a folder to move them, or onto empty space to move them to the top level.
-- **Group:** select several themes, then press **Group…** (or Ctrl+G, or right-click) to put them into a new or existing folder in one step.
+- **Group:** select several themes, then press **Group…** (or Ctrl+G, or right-click) and type the folder name right in the list. The items move into it, and the new folder appears where the first of them was. Typing an existing folder's name moves them into that folder.
 - **Undo layer visibility:** the **↶** button next to the status line (or **Ctrl+Z**) steps the layer checkboxes back one change, and **↷** (Ctrl+Y) redoes. This undoes an accidental *Hide All*, a mis-click in the Layers panel, or applying the wrong theme. The **▾** arrow lists the last 30 states (e.g. "Hidden: roads", "Theme “X”") to jump to directly. Your saved themes are never changed by this. The actions are also in *Plugins ▸ Map Themes Evolved*, where you can give them global shortcuts.
-- **Reorder:** drag a folder or theme *between* rows to put it there. Dropping *onto* a folder moves the item into it. The custom order is saved in the project (see Compatibility); anything you haven't placed keeps natural sorting. Folders stay above themes.
+- **Reorder:** drag a folder or theme *between* rows to put it there. Dropping *onto* a folder moves the item into it. Folders and themes can be mixed in any order, like in the Layers panel, and dropping on the empty space below the list moves an item to the end. The custom order is saved in the project (see Compatibility); anything you haven't placed keeps natural sorting.
 - **New theme** and **New folder** add a row you type the name into. Type `Area/Topic/Name` to create subfolders on the fly.
 - **Theme edits** (rename, move, group, delete, reorder…) can be undone from the message bar's *Undo* link or *⋯ ▸ Undo last theme edit*.
 - **Open as panel** (window icon) docks the same browser beside the map, which is handy for longer organising sessions.
@@ -35,7 +35,7 @@ Click the **eye button** in the Layers panel.
 | Ctrl+G | group the selection into a folder |
 | Ctrl+Z / Ctrl+Y | undo / redo layer visibility |
 | F2, or a slow second click | rename in place |
-| Del | delete the selection (can be undone) |
+| Del | delete the selection, no confirmation box (Undo brings it back) |
 | Esc | clear the search, then close |
 
 You can assign a shortcut to *Browse Map Themes…* in *Settings ▸ Keyboard Shortcuts*.

@@ -65,7 +65,6 @@ class ThemePopup(QFrame):
         self.setMinimumSize(MIN_SIZE)
         self._anchor = None       # widget the popup opens under
         self._anchor_pos = None   # or a global position
-        self._suspended = False
         self.last_hidden = 0.0
         saved = geometry.load_raw(GEOMETRY_NAME) or {}
         self.moved_by_user = bool(saved.get("moved"))
@@ -136,17 +135,7 @@ class ThemePopup(QFrame):
     def _save(self):
         geometry.save_geometry(GEOMETRY_NAME, self.geometry(), {"moved": self.moved_by_user})
 
-    # host interface for ThemeBrowser: hide around modal dialogs ------------
-    def suspend(self):
-        self._suspended = True
-        self.hide()
-
-    def resume(self):
-        self._suspended = False
-        self._open(prepare=False)
-
     def hideEvent(self, event):
         self._save()
-        if not self._suspended:
-            self.last_hidden = time.monotonic()
+        self.last_hidden = time.monotonic()
         super().hideEvent(event)

@@ -18,18 +18,16 @@ Used inside the eye-button popup (``host`` set) and the dock panel (``host`` Non
 
 import hashlib
 import json
-from contextlib import contextmanager
 
 from qgis.PyQt.QtCore import QEvent, QItemSelectionModel, QPoint, Qt, QTimer, pyqtSignal
 from qgis.PyQt.QtWidgets import (QAbstractItemView, QApplication, QFrame, QHBoxLayout, QLabel, QMenu,
-                                 QMessageBox, QSizePolicy, QToolButton, QTreeView, QVBoxLayout,
+                                 QSizePolicy, QToolButton, QTreeView, QVBoxLayout,
                                  QWidget)
 from qgis.core import QgsSettings
 from qgis.gui import QgsFilterLineEdit
 
 from ..core import paths
 from .common import SETTINGS_PREFIX, QAction, event_pos, theme_icon, tr
-from .dialogs import FolderDialog
 from .model import KIND_ROLE, NAME_ROLE, PATH_ROLE, ThemeTreeModel, folder_to_key, item_key, key_to_folder
 
 #: native QGIS layer-visibility actions, reused as-is (same objects, same behaviour)
@@ -93,12 +91,13 @@ class ThemeBrowser(QWidget):
         self.undo = undo
         self.notifier = notifier
         self.iface = iface
-        self.host = host                  # has suspend()/resume() around modal dialogs
+        self.host = host                  # the popup (None inside the dock)
         self.classic_menu = classic_menu  # callable -> native QMenu or None
         self._pending_key = None
         self._edit_after_refresh = None
         self._edit_request = None
         self._placeholder = None          # (kind, folder, text) while typing a new item
+        self._group_keys = None           # items to move into the folder being typed
         self._press_pos = None
         self._restoring = False
         self._dirty = True
@@ -379,6 +378,8 @@ class ThemeBrowser(QWidget):
         current, modified = self.service.status()
         self._modified_theme = modified
         placeholder = None if query else self._placeholder
+        scrollbar = self.tree.verticalScrollBar()
+        old_scroll = scrollbar.value()
         best = self.model.rebuild(query, current, modified, placeholder)
         has_folders = any(kind in ("folder", "new-folder") for kind, _ in self.model.items_by_key)
         self.tree.setRootIsDecorated(has_folders)
@@ -403,6 +404,11 @@ class ThemeBrowser(QWidget):
                 target = ("theme", min(current, key=paths.natural_key) if current else modified)
             if target is None or target not in self.model.items_by_key:
                 target = keep if keep in self.model.items_by_key else best
+            if not (prefer_best or select_current):
+                # rebuilding resets the scroll position — keep the view where it was;
+                # _select below only scrolls if the selected row would be off-screen
+                self.tree.doItemsLayout()
+                scrollbar.setValue(old_scroll)
             self._select(target)
         finally:
             self._restoring = False
@@ -557,6 +563,8 @@ class ThemeBrowser(QWidget):
         return False
 
     def _tree_key(self, event):
+        if self.tree.state() == QAbstractItemView.State.EditingState:
+            return False  # keys belong to the inline editor (Enter = confirm rename only)
         key = event.key()
         if key in _ENTER_KEYS:
             self.activate(self.selected_index(), keep_open=self._ctrl(event))
@@ -801,6 +809,8 @@ class ThemeBrowser(QWidget):
     def _after_edit(self):
         request, self._edit_request = self._edit_request, None
         placeholder, self._placeholder = self._placeholder, None
+        if not request:
+            self._group_keys = None  # typing cancelled
         if request:
             key, text = request
             try:
@@ -836,6 +846,10 @@ class ThemeBrowser(QWidget):
                 self._placeholder = ("new-folder", parent, text)
                 return
             folder = parent + tuple(paths.split_path(text, sep))
+            keys, self._group_keys = self._group_keys, None
+            if keys:  # "Group…" / "Move to ▸ New folder": move the items into it
+                self._group_into(keys, parent, folder)
+                return
             if folder in self.service.folders():
                 self._pending_key = ("folder", folder_to_key(folder))
                 return
@@ -872,16 +886,6 @@ class ThemeBrowser(QWidget):
     # ------------------------------------------------------------------
     # operations
     # ------------------------------------------------------------------
-    @contextmanager
-    def _modal(self):
-        if self.host is not None:
-            self.host.suspend()
-        try:
-            yield self.iface.mainWindow()
-        finally:
-            if self.host is not None:
-                self.host.resume()
-
     def replace_theme(self, name):
         old = self.service.replace_with_current(name)
         self.service.last_applied = name
@@ -915,7 +919,7 @@ class ThemeBrowser(QWidget):
             self.delete_folder(key_to_folder(key[1]))
 
     def delete_keys(self, keys):
-        """Delete several selected themes and folders as one undoable step."""
+        """Delete several selected themes and folders as one undoable step (no dialog)."""
         sep = self.service.separator
         all_names = self.service.names()
         names, folders = [], []
@@ -926,41 +930,45 @@ class ThemeBrowser(QWidget):
                 folders.append(key_to_folder(val))
                 names.extend(paths.themes_in_folder(all_names, folders[-1], sep))
         names = list(dict.fromkeys(names))
-        if folders and names:
-            with self._modal() as parent:
-                answer = QMessageBox.question(
-                    parent, tr("Delete"),
-                    tr("Delete {0} folder(s) and {1} theme(s) in total?\n\n"
-                       "You can undo this right after.").format(len(folders), len(names)),
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
-                    QMessageBox.StandardButton.Cancel)
-                if answer != QMessageBox.StandardButton.Yes:
-                    return
         for f in folders:
             self._drop_session_folders(f)
         if names:
-            self.delete_themes(names)
+            self.delete_themes(names, tr("Deleted {0} folder(s) and {1} theme(s).").format(
+                len(folders), len(names)) if folders else None)
         self.refresh()
 
-    def group_selected(self):
-        """Ask for a folder name and move all selected items into it."""
-        keys = self.selected_keys()
+    def group_selected(self, keys=None):
+        """Type a folder name right in the list; the selected items move into it."""
+        keys = keys or self.selected_keys()
         if not keys or not self.service.separator:
             return
         sep = self.service.separator
         kind, val = keys[0]
         parent = paths.folder_of(val, sep) if kind == "theme" else key_to_folder(val)[:-1]
-        with self._modal() as dlg_parent:
-            dlg = FolderDialog(dlg_parent, self.service,
-                               tr("Group {} Item(s) into Folder").format(len(keys)),
-                               initial_folder=parent, ok_text=tr("Group"), allow_existing=True)
-            if not dlg.exec():
-                return
-            folder = dlg.folder()
+        self._group_keys = list(keys)
+        self._start_placeholder("new-folder", parent, tr("New group"))
+
+    def _group_into(self, keys, parent, folder):
+        """Move ``keys`` into ``folder`` and show the folder where the first item was."""
+        sep = self.service.separator
+        siblings = self.model.child_entries(parent)
+
+        def entry(k, v):
+            return (paths.theme_entry(paths.leaf_of(v, sep)) if k == "theme"
+                    else paths.folder_entry(key_to_folder(v)[-1]))
+
+        first = entry(*keys[0])
+        pos = siblings.index(first) if first in siblings else len(siblings)
         self.move_items(keys, folder)
+        if folder[:-1] == parent and folder in self.service.folders():
+            moved = {entry(k, v) for k, v in keys}
+            new_entry = paths.folder_entry(folder[-1])
+            rest = [e for e in siblings if e not in moved and e != new_entry]
+            before = sum(1 for e in siblings[:pos] if e in moved or e == new_entry)
+            pos = max(0, min(pos - before, len(rest)))
+            self.service.set_order(parent, rest[:pos] + [new_entry] + rest[pos:])
         self._expand_path(folder)
         self._pending_key = ("folder", folder_to_key(folder))
-        self.refresh()
 
     # ------------------------------------------------------------------
     # layer visibility history
@@ -1030,24 +1038,14 @@ class ThemeBrowser(QWidget):
         self.notifier.done(text, op)
 
     def delete_folder(self, folder):
+        """Delete a folder and its themes — no dialog; Undo brings it back."""
         sep = self.service.separator
         names = paths.themes_in_folder(self.service.names(), folder, sep)
-        pretty = paths.format_folder(folder, sep, True)
+        self._drop_session_folders(folder)
         if names:
-            with self._modal() as parent:
-                answer = QMessageBox.question(
-                    parent, tr("Delete Folder"),
-                    tr("Delete the folder “{0}” and the {1} theme(s) inside it?\n\n"
-                       "You can undo this right after.").format(pretty, len(names)),
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
-                    QMessageBox.StandardButton.Cancel)
-                if answer != QMessageBox.StandardButton.Yes:
-                    return
-                self._drop_session_folders(folder)
-                self.delete_themes(names, tr("Folder “{0}” deleted ({1} themes).").format(pretty, len(names)))
-        else:
-            self._drop_session_folders(folder)
-            self.refresh()
+            pretty = paths.format_folder(folder, sep, True)
+            self.delete_themes(names, tr("Folder “{0}” deleted ({1} themes).").format(pretty, len(names)))
+        self.refresh()
 
     def move_items(self, keys, target, row=None):
         """Move themes and/or folders into ``target``; with ``row``, also place them there.
@@ -1071,7 +1069,14 @@ class ThemeBrowser(QWidget):
                     folder_moves.append((f, target + (f[-1],)))
                 moved_entries.append(paths.folder_entry(f[-1]))
         theme_map = {o: n for o, n in theme_map.items() if o != n}
-        children = self.model.child_entries(target) if row is not None and row >= 0 else None
+        children = None
+        if row is not None:
+            if row >= 0:
+                children = self.model.child_entries(target)
+            elif not folder_moves and not theme_map:
+                # dropped on empty space / onto its own folder: move to the end
+                children = self.model.child_entries(target)
+                row = len(children)
         try:
             if folder_moves:
                 self._move_folders(folder_moves, tr("Moved"), extra=theme_map, target=target)
@@ -1141,13 +1146,7 @@ class ThemeBrowser(QWidget):
             self.refresh()
 
     def _move_to_new_folder(self, keys):
-        with self._modal() as parent:
-            dlg = FolderDialog(parent, self.service, tr("Move to New Folder"),
-                               initial_folder=self.target_folder(), ok_text=tr("Move"))
-            if not dlg.exec():
-                return
-            folder = dlg.folder()
-        self.move_items(keys, folder)
+        self.group_selected(keys)
 
     def _folder_label(self, folder):
         return paths.format_folder(folder, self.service.separator, True) if folder else tr("top level")

@@ -211,38 +211,51 @@ class ThemeTreeModel(QStandardItemModel):
         item.setDropEnabled(kind == "folder")
 
     def _fill(self, parent_item, node, folder, current, modified, marked_folders, placeholder):
+        """Add a folder's children: custom order first (folders and themes mixed,
+        like the Layers panel), then unplaced folders, then unplaced themes, both
+        naturally sorted."""
         order = self.service.order_for(folder)
-        if placeholder and placeholder[0] == "new-folder" and tuple(placeholder[1]) == folder:
-            self._add_placeholder(parent_item, placeholder)
-        for seg in sorted(node["folders"], key=lambda sg: paths.order_key(order, paths.folder_entry(sg), sg)):
-            path = folder + (seg,)
-            it = QStandardItem(theme_icon("folder"), seg)
-            it.setData("folder", KIND_ROLE)
-            it.setData(folder_to_key(path), PATH_ROLE)
-            self._flags(it, "folder")
-            if path in marked_folders:
-                _bold(it)
-            parent_item.appendRow(it)
-            self.items_by_key[("folder", folder_to_key(path))] = it
-            self._fill(it, node["folders"][seg], path, current, modified, marked_folders, placeholder)
-        if placeholder and placeholder[0] == "new-theme" and tuple(placeholder[1]) == folder:
-            self._add_placeholder(parent_item, placeholder)
-        for leaf, name in sorted(node["themes"],
-                                 key=lambda ln: paths.order_key(order, paths.theme_entry(ln[0]), ln[0])):
-            if name in current:
-                ic = theme_icon("theme-current")
-            elif name == modified:
-                ic = theme_icon("theme-modified")
+        children = [(paths.folder_entry(seg), "folder", seg) for seg in node["folders"]]
+        children += [(paths.theme_entry(leaf), "theme", (leaf, name)) for leaf, name in node["themes"]]
+
+        def sort_key(child):
+            entry, kind, data = child
+            text = data if kind == "folder" else data[0]
+            if entry in order:
+                return (0, order.index(entry), 0, paths.natural_key(text))
+            return (1, 0, 0 if kind == "folder" else 1, paths.natural_key(text))
+
+        for entry, kind, data in sorted(children, key=sort_key):
+            if kind == "folder":
+                seg = data
+                path = folder + (seg,)
+                it = QStandardItem(theme_icon("folder"), seg)
+                it.setData("folder", KIND_ROLE)
+                it.setData(folder_to_key(path), PATH_ROLE)
+                self._flags(it, "folder")
+                if path in marked_folders:
+                    _bold(it)
+                parent_item.appendRow(it)
+                self.items_by_key[("folder", folder_to_key(path))] = it
+                self._fill(it, node["folders"][seg], path, current, modified, marked_folders, placeholder)
             else:
-                ic = theme_icon("theme")
-            it = QStandardItem(ic, leaf)
-            it.setData("theme", KIND_ROLE)
-            it.setData(name, NAME_ROLE)
-            self._flags(it, "theme")
-            if name in current or name == modified:
-                _bold(it)
-            parent_item.appendRow(it)
-            self.items_by_key[("theme", name)] = it
+                leaf, name = data
+                if name in current:
+                    ic = theme_icon("theme-current")
+                elif name == modified:
+                    ic = theme_icon("theme-modified")
+                else:
+                    ic = theme_icon("theme")
+                it = QStandardItem(ic, leaf)
+                it.setData("theme", KIND_ROLE)
+                it.setData(name, NAME_ROLE)
+                self._flags(it, "theme")
+                if name in current or name == modified:
+                    _bold(it)
+                parent_item.appendRow(it)
+                self.items_by_key[("theme", name)] = it
+        if placeholder and tuple(placeholder[1]) == folder:
+            self._add_placeholder(parent_item, placeholder)  # typed-in new item goes last
 
     def _add_placeholder(self, parent_item, placeholder):
         kind, folder, text = placeholder
