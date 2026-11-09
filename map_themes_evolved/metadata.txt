@@ -1,0 +1,21 @@
+[general]
+name=Map Themes Evolved
+qgisMinimumVersion=3.34
+qgisMaximumVersion=4.99
+supportsQt6=True
+description=Searchable, folder-based map theme browser on the Layers panel eye button — fully compatible with native map themes.
+about=Replaces the flat "Manage Map Themes" menu with a popup that has instant search, nested folders, drag and drop and one-click "Update theme". Folders are just part of the theme name ("Area/Topic/Theme"), so projects stay 100% compatible with plain QGIS: nothing is stored besides the normal map themes. Includes undo, a dockable panel, and keeps all native layer-visibility actions plus the classic menu (right-click the eye button).
+version=0.2.0
+author=danzig666
+email=5346511+danzig666@users.noreply.github.com
+tags=map themes,visibility presets,layers,search,folders,organisation
+category=Plugins
+icon=icon.png
+homepage=https://github.com/danzig666/qgis-map-themes-evolved
+repository=https://github.com/danzig666/qgis-map-themes-evolved
+tracker=https://github.com/danzig666/qgis-map-themes-evolved/issues
+experimental=True
+deprecated=False
+hasProcessingProvider=no
+changelog=0.2.0 Status line with Update / Save as new; inline new/rename; right-click menu with Move to; drag and drop into folders; dock panel; custom icons; fix error when opening another project.
+    0.1.0 First MVP.
