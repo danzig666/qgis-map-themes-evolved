@@ -20,6 +20,7 @@ import hashlib
 import json
 
 from qgis.PyQt.QtCore import QEvent, QItemSelectionModel, QPoint, Qt, QTimer, pyqtSignal
+from qgis.PyQt.QtGui import QBrush, QPalette
 from qgis.PyQt.QtWidgets import (QAbstractItemDelegate, QAbstractItemView, QApplication, QFrame,
                                  QHBoxLayout, QLabel, QLineEdit, QMenu, QSizePolicy, QToolButton,
                                  QTreeView, QVBoxLayout, QWidget)
@@ -149,9 +150,19 @@ class ThemeBrowser(QWidget):
         self.status = QFrame(self)
         self.status.setObjectName("mteStatus")
         self.status.setFrameShape(QFrame.Shape.StyledPanel)
-        st = QHBoxLayout(self.status)
-        st.setContentsMargins(6, 2, 2, 2)
+        # row 1: icon · status text · undo/redo   — row 2 (only when useful):
+        # [Update “X”] [Save as new…], so the text never gets squeezed
+        status_rows = QVBoxLayout(self.status)
+        status_rows.setContentsMargins(6, 2, 2, 2)
+        status_rows.setSpacing(0)
+        st = QHBoxLayout()
         st.setSpacing(4)
+        status_rows.addLayout(st)
+        self.status_actions = QWidget(self.status)
+        act_row = QHBoxLayout(self.status_actions)
+        act_row.setContentsMargins(16, 0, 0, 0)
+        act_row.setSpacing(4)
+        status_rows.addWidget(self.status_actions)
         self.status_icon = QLabel(self.status)
         self.status_text = ElideLabel(self.status)
         self.btn_update = QToolButton(self.status)
@@ -169,8 +180,9 @@ class ThemeBrowser(QWidget):
         self.btn_save_new.clicked.connect(lambda: self.start_new_theme())
         st.addWidget(self.status_icon)
         st.addWidget(self.status_text, 1)
-        st.addWidget(self.btn_update)
-        st.addWidget(self.btn_save_new)
+        act_row.addWidget(self.btn_update)
+        act_row.addWidget(self.btn_save_new)
+        act_row.addStretch(1)
         if self.history is not None:
             self.btn_vis_undo = QToolButton(self.status)
             self.btn_vis_undo.setIcon(theme_icon("undo"))
@@ -414,6 +426,14 @@ class ThemeBrowser(QWidget):
             self._select(target)
         finally:
             self._restoring = False
+        if self._group_keys and placeholder:
+            # while the group name is typed, keep showing which items will move into it
+            mark = self.palette().color(QPalette.ColorGroup.Active, QPalette.ColorRole.Highlight)
+            mark.setAlpha(70)
+            for key in self._group_keys:
+                item = self.model.items_by_key.get(tuple(key))
+                if item is not None:
+                    item.setBackground(QBrush(mark))
         self._update_status(current, modified)
         self._update_actions()
 
@@ -436,6 +456,10 @@ class ThemeBrowser(QWidget):
         names_exist = bool(self.service.names())
         self.btn_update.setVisible(bool(modified))
         self.btn_save_new.setVisible(not current)
+        self.status_actions.setVisible(not current)
+        if modified:
+            leaf = paths.leaf_of(modified, self.service.separator)
+            self.btn_update.setText(tr("Update “{}”").format(leaf))
         if current:
             ordered = sorted(current, key=paths.natural_key)
             text = tr("Active: {}").format(ordered[0])
@@ -674,11 +698,15 @@ class ThemeBrowser(QWidget):
     # context menu
     # ------------------------------------------------------------------
     def _context_menu(self, pos):
+        menu = self.build_context_menu(pos)
+        menu.exec(self.tree.viewport().mapToGlobal(pos))
+
+    def build_context_menu(self, pos):
+        """The right-click menu for viewport position ``pos`` (not shown)."""
         idx = self.tree.indexAt(pos)
         selected = self.selected_keys()
         if idx.isValid() and len(selected) > 1 and self.tree.selectionModel().isSelected(idx):
-            self._multi_context_menu(pos, selected)
-            return
+            return self._multi_context_menu(selected)
         if idx.isValid():
             self.tree.setCurrentIndex(idx)
         m = QMenu(self)
@@ -729,9 +757,9 @@ class ThemeBrowser(QWidget):
             m.addSeparator()
             m.addAction(theme_icon("expand"), tr("Expand all folders"), self._expand_all)
             m.addAction(theme_icon("collapse"), tr("Collapse all folders"), self._collapse_all)
-        m.exec(self.tree.viewport().mapToGlobal(pos))
+        return m
 
-    def _multi_context_menu(self, pos, keys):
+    def _multi_context_menu(self, keys):
         m = QMenu(self)
         n = len(keys)
         if self.service.separator:
@@ -745,7 +773,7 @@ class ThemeBrowser(QWidget):
         m.addSeparator()
         m.addAction(theme_icon("delete"), tr("Delete {} items…").format(n) + "\tDel",
                     lambda: self.delete_keys(keys))
-        m.exec(self.tree.viewport().mapToGlobal(pos))
+        return m
 
     def _add_move_menu(self, menu, keys, exclude=None):
         sub = menu.addMenu(theme_icon("move"), tr("Move to"))

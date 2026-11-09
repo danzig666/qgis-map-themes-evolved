@@ -6,6 +6,18 @@ A QGIS plugin that turns the eye button in the Layers panel ("Manage Map Themes"
 
 Folders are just part of the theme name: `Debrecen/Land use/Residential` shows up as `Residential` in the folders `Debrecen ▸ Land use`. Nothing else is stored, so a project opened without the plugin behaves exactly as before. You just see the full names in the flat list.
 
+<p align="center"><img src="docs/screenshots/overview.png" width="430" alt="The Map Themes popup: folders, the active theme marked, Apply / New theme / New folder"></p>
+
+## Screenshots
+
+*(Demo project with made-up names.)*
+
+| Search: words in any order | Layers changed → Update, or undo layer visibility |
+|---|---|
+| <img src="docs/screenshots/search.png" width="400" alt="Searching “tra riv” finds Riverton ▸ Transport themes"> | <img src="docs/screenshots/history.png" width="440" alt="Status line offers Update “Residential” and Save as new; the undo dropdown lists recent layer states"> |
+| **Right-click: Move to a folder, rename, duplicate…** | **Group selected themes: type the folder name in place** |
+| <img src="docs/screenshots/context-menu.png" width="440" alt="Right-click menu with the Move to submenu listing folders"> | <img src="docs/screenshots/group.png" width="400" alt="Two selected themes stay highlighted while the new group name is typed"> |
+
 ## Using it
 
 Click the **eye button** in the Layers panel.
@@ -76,6 +88,8 @@ map_themes_evolved/
 ├── hook/eye_button.py find, hook and restore the Layers-panel eye button
 ├── ui/                tree model, browser widget, popup, dock, dialogs
 ├── icons/             plugin icons (generated from assets/icon_sheet.png)
+scripts/build_zip.py           builds the release zip
+scripts/screenshots/           regenerates the README screenshots from a demo project
 └── plugin.py          wiring
 ```
 

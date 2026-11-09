@@ -5,7 +5,7 @@ qgisMaximumVersion=4.99
 supportsQt6=True
 description=Searchable, folder-based map theme browser on the Layers panel eye button — fully compatible with native map themes.
 about=Replaces the flat "Manage Map Themes" menu with a popup that has instant search, nested folders, drag and drop and one-click "Update theme". Folders are just part of the theme name ("Area/Topic/Theme"), so projects stay 100% compatible with plain QGIS: nothing is stored besides the normal map themes. Includes undo, a dockable panel, and keeps all native layer-visibility actions plus the classic menu (right-click the eye button).
-version=0.4.2
+version=0.4.3
 author=danzig666
 email=5346511+danzig666@users.noreply.github.com
 tags=map themes,visibility presets,layers,search,folders,organisation
@@ -17,7 +17,8 @@ tracker=https://github.com/danzig666/qgis-map-themes-evolved/issues
 experimental=True
 deprecated=False
 hasProcessingProvider=no
-changelog=0.4.2 Fix: the popup sometimes stayed open after applying a theme (a delayed slow-click rename left a hidden editor behind) — slow-click rename removed (use F2), double-click detection made reliable, unfinished names are cancelled when the popup closes; fixed a possible crash in the folder menu's Expand/Collapse inside.
+changelog=0.4.3 Status line: Update / Save as new moved to their own row so the status text is never cut off; themes being grouped stay highlighted while the folder name is typed; README screenshots.
+    0.4.2 Fix: the popup sometimes stayed open after applying a theme (a delayed slow-click rename left a hidden editor behind) — slow-click rename removed (use F2), double-click detection made reliable, unfinished names are cancelled when the popup closes; fixed a possible crash in the folder menu's Expand/Collapse inside.
     0.4.1 Fixes: Enter after an F2 rename no longer applies the theme; folders can be dragged between themes (mixed order) and to the end; the list keeps its scroll position after drag/drop and edits; Group and Move to new folder are typed in place, and deleting needs no confirmation box (use Undo), so the popup never closes for editing.
     0.4.0 Reorder folders and themes by dragging between rows (order saved in the project); the main undo button now undoes layer visibility (Ctrl+Z / Ctrl+Y redo, dropdown history of the last 30 states); theme-edit undo moved to the message bar and the ⋯ menu.
     0.3.0 Click selects, double-click / Enter / Apply applies (no accidental changes); multi-select with Group into folder (Ctrl+G), multi move/delete; layer visibility history with one-click restore; popup and panel position remembered in QGIS settings, safe across monitor and resolution changes.
