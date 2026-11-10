@@ -127,6 +127,10 @@ class ThemePopup(QFrame):
         self._grip.raise_()
 
     def _edges_at(self, pos):
+        # A popup also receives clicks *outside* it (that's how it closes);
+        # only the border strips inside the window are resize handles.
+        if not self.rect().contains(pos):
+            return ""
         edges = ""
         if pos.x() < EDGE:
             edges += "l"
