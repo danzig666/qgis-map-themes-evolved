@@ -362,6 +362,11 @@ class ThemeBrowser(QWidget):
         if self._expanded_project == key:
             return
         self._expanded_project = key
+        stored = self.service.expanded_folders()
+        if stored is not None or not self.service.project.absoluteFilePath():
+            self._expanded = stored or set()
+            return
+        # older versions kept this in the QGIS settings: carry it over once
         raw = QgsSettings().value(self._settings_key(), "[]")
         try:
             self._expanded = set(json.loads(raw))
@@ -369,7 +374,8 @@ class ThemeBrowser(QWidget):
             self._expanded = set()
 
     def _save_expanded(self):
-        QgsSettings().setValue(self._settings_key(), json.dumps(sorted(self._expanded)))
+        """Folder open/closed state is saved in the project (with the project file)."""
+        self.service.set_expanded_folders(self._expanded)
 
     def _remember_expanded(self, index, expanded):
         if self._restoring or self.search.text().strip():

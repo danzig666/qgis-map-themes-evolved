@@ -41,7 +41,7 @@ A QGIS plugin that replaces the eye-icon "Manage Map Themes" menu with a searcha
 2. **Names are only changed when you rename or move something.** Opening, browsing or searching never writes.
 3. **Rename and move go through `renameMapTheme(old, new)`.** Never remove + insert.
 4. **Replace goes through `update(name, record)`**, using `QgsMapThemeCollection.createThemeFromCurrentState(root, model)` exactly like native.
-5. **Project file:** the plugin writes only its own project custom properties (`QgsProject.writeEntry("MapThemesEvolved", …)`): the custom folder/theme order and the separator choice. QGIS ignores these entries. Expanded folders and window geometry go to QgsSettings.
+5. **Project file:** the plugin writes only its own project custom properties (`QgsProject.writeEntry("MapThemesEvolved", …)`): the custom folder/theme order, the expanded folders and the separator choice. QGIS ignores these entries. Window geometry goes to QgsSettings.
 6. **Live sync:** themes changed by native UI, scripts or other plugins show up immediately (via `mapThemesChanged`, `mapThemeRenamed`, `mapThemeChanged`, `QgsProject.readProject` and `cleared`).
 7. **Clean unload:** restore the original menu and popup mode on the eye button. Disconnect every signal. Hook and unhook can safely run more than once (Plugin Reloader safe).
 8. **Native menu always reachable:** "Classic menu…" entry in the popup, plus an optional setting: right-click on the eye button opens the native menu.
@@ -168,7 +168,7 @@ See §10 for findings. Repeat the same three console scripts on QGIS 4.x (Qt6) b
 ### Phase 1 — MVP (v0.1) ✅ built 2026-11-09, tested live on 3.44.9
 Differences from the original MVP list:
 - Duplicate and "Move to folder…" moved up from Phase 2. They were cheap to add.
-- Expanded folders are remembered in QgsSettings (keyed by project path), not in the project file, so expanding a folder never marks the project as changed.
+- Expanded folders were first kept in QgsSettings (keyed by project path). Since 0.5.0 they are saved in the project (`MapThemesEvolved/expanded`) so they travel with the file; expanding a folder marks the project as changed. Old QgsSettings values are used once as a fallback.
 - Ranked search keeps the tree layout, all expanded; the best match is preselected so Enter applies it. Highlighting matched text is left for Phase 3.
 - A setting for single- vs double-click to apply is still missing; single click applies for now.
 

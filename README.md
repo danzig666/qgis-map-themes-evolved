@@ -56,8 +56,10 @@ You can assign a shortcut to *Browse Map Themes…* in *Settings ▸ Keyboard Sh
 
 - Reads and writes only through QGIS's own map-theme API (`QgsMapThemeCollection`).
 - Renames use `renameMapTheme`, so **print layouts that follow a theme are updated by QGIS itself**. Data-defined theme expressions are *not* updated by QGIS. Check those after renaming.
-- The only extra thing stored in the project is your **custom order**, as a project property (`MapThemesEvolved/order`), and only once you reorder something. QGIS without the plugin ignores it.
-- Folder open/closed state, window positions and the layer visibility history are never stored in the project. The first two are in your QGIS settings; the history lasts only for the session.
+- The plugin stores two extra things in the project, as project properties that QGIS without the plugin ignores:
+  - your **custom order** (`MapThemesEvolved/order`), once you reorder something;
+  - which **folders are open or closed** (`MapThemesEvolved/expanded`), so the tree looks the same when you (or a colleague) open the project again. Opening or closing a folder therefore marks the project as changed; it's saved with the next project save.
+- Window positions and the layer visibility history are never stored in the project. Window positions are in your QGIS settings; the history lasts only for the session.
 - Disabling the plugin restores the original eye-button menu immediately.
 
 Tested on QGIS 3.44 (Qt5). It's written to also work on QGIS 4.x (Qt6), but that hasn't been tested yet.

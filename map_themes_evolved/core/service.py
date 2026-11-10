@@ -159,6 +159,26 @@ class ThemeService(QObject):
         self._order = {k: v for k, v in self._order.items() if v}
         self._project.writeEntry(SCOPE, "order", json.dumps(self._order, ensure_ascii=False))
 
+    # ------------------------------------------------------------------
+    # expanded folders (project custom property "MapThemesEvolved/expanded")
+    # ------------------------------------------------------------------
+    def expanded_folders(self):
+        """Folder keys open in the browser, or None if the project has none stored."""
+        raw, ok = self._project.readEntry(SCOPE, "expanded", "")
+        if not (ok and raw):
+            return None
+        try:
+            data = json.loads(raw)
+        except ValueError:
+            return None
+        return {str(k) for k in data} if isinstance(data, list) else None
+
+    def set_expanded_folders(self, keys):
+        value = json.dumps(sorted(keys), ensure_ascii=False)
+        raw, ok = self._project.readEntry(SCOPE, "expanded", "")
+        if not ok or raw != value:  # don't mark the project modified for nothing
+            self._project.writeEntry(SCOPE, "expanded", value)
+
     def order_for(self, folder):
         return self._order.get(ORDER_GLUE.join(folder), [])
 
