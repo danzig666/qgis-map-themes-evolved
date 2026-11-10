@@ -4,7 +4,7 @@
 
 A QGIS plugin that turns the eye button in the Layers panel ("Manage Map Themes") into a searchable, folder-based theme browser. It stays fully compatible with native QGIS map themes.
 
-Folders are just part of the theme name: `Riverton/Land use/Residential` shows up as `Residential` in the folders `Riverton ▸ Land use`. Nothing else is stored, so a project opened without the plugin behaves exactly as before. You just see the full names in the flat list.
+Folders are just part of the theme name: `Riverton/Land use/Residential` shows up as `Residential` in the folders `Riverton ▸ Land use`. The themes stay ordinary QGIS map themes, so a project opened without the plugin behaves exactly as before. You just see the full names in the flat list. (The plugin's own extras, such as custom order and open folders, are separate project properties that QGIS ignores; see Compatibility.)
 
 <p align="center"><img src="docs/screenshots/overview.png" width="430" alt="The Map Themes popup: folders, the active theme marked, Apply / New theme / New folder"></p>
 
@@ -75,6 +75,33 @@ For development, link the plugin folder into your profile (PowerShell):
 New-Item -ItemType Junction -Path "$env:APPDATA\QGIS\QGIS3\profiles\default\python\plugins\map_themes_evolved" -Target "<repo>\map_themes_evolved"
 ```
 
+## Languages
+
+The plugin follows QGIS's interface language (*Settings ▸ Options ▸ General ▸ Override system locale*). It is available in **English** and **Hungarian (magyar)**. Any other language falls back to English. After changing the QGIS language, restart QGIS.
+
+### Adding a translation
+
+Translations are plain JSON files in [`map_themes_evolved/i18n/`](map_themes_evolved/i18n), one per language, mapping the English text to the translation:
+
+```json
+{
+  "Apply": "Alkalmaz",
+  "Delete {} items…": "{} elem törlése…"
+}
+```
+
+1. Create the file with every text to translate (here German, `de`):
+
+   ```bash
+   python scripts/i18n_update.py de
+   ```
+
+2. Fill in the empty values in `map_themes_evolved/i18n/de.json`. Leave a value empty to keep that text in English. Keep `{}` / `{0}` placeholders and line breaks (`
+`).
+3. Run `python -m pytest map_themes_evolved/test` to check placeholders, then open a pull request.
+
+The file name is the QGIS language code: `de` covers every German locale, and a file like `pt_BR.json` is used before `pt.json`. When the plugin gets new texts, `python scripts/i18n_update.py` adds them (empty) to every language file and lists what's still untranslated.
+
 ## Tests
 
 ```bash
@@ -88,10 +115,13 @@ map_themes_evolved/
 ├── core/paths.py      pure-Python name/folder/sort/search logic (unit-tested)
 ├── core/service.py    the only code touching QgsMapThemeCollection
 ├── core/undo.py       undo stack
+├── core/i18n.py       translation loader (JSON files in i18n/)
+├── i18n/              translations: hu.json, …
 ├── hook/eye_button.py find, hook and restore the Layers-panel eye button
 ├── ui/                tree model, browser widget, popup, dock, dialogs
 ├── icons/             plugin icons (generated from assets/icon_sheet.png)
 scripts/build_zip.py           builds the release zip
+scripts/i18n_update.py         creates/updates translation files
 scripts/screenshots/           regenerates the README screenshots from a demo project
 └── plugin.py          wiring
 ```

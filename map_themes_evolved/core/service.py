@@ -13,6 +13,7 @@ from qgis.PyQt.QtCore import QObject, QTimer, pyqtSignal
 from qgis.core import QgsMapThemeCollection, QgsProject
 
 from . import paths
+from .i18n import tr
 
 SCOPE = "MapThemesEvolved"
 TMP_PREFIX = "⁣mte-tmp-"
@@ -324,7 +325,7 @@ class ThemeService(QObject):
         names = set(self.names())
         missing = [o for o in mapping if o not in names]
         if missing:
-            raise ValueError(f"Theme “{missing[0]}” no longer exists.")
+            raise ValueError(tr("Theme “{}” no longer exists.").format(missing[0]))
         err = paths.check_batch(mapping, names, self.separator)
         if err:
             raise ValueError(err)
@@ -337,17 +338,17 @@ class ThemeService(QObject):
                 for i, old in enumerate(mapping):
                     tmp = f"{TMP_PREFIX}{i}-{old}"
                     if not coll.renameMapTheme(old, tmp):
-                        raise ValueError(f"Could not rename “{old}”.")
+                        raise ValueError(tr("Could not rename “{}”.").format(old))
                     done.append((old, tmp))
                     temps[tmp] = mapping[old]
                 for tmp, new in temps.items():
                     if not coll.renameMapTheme(tmp, new):
-                        raise ValueError(f"Could not rename to “{new}”.")
+                        raise ValueError(tr("Could not rename to “{}”.").format(new))
                     done.append((tmp, new))
             else:
                 for old, new in mapping.items():
                     if not coll.renameMapTheme(old, new):
-                        raise ValueError(f"Could not rename “{old}” to “{new}”.")
+                        raise ValueError(tr("Could not rename “{}” to “{}”.").format(old, new))
                     done.append((old, new))
         except ValueError:
             for frm, to in reversed(done):

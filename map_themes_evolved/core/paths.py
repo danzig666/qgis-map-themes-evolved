@@ -11,6 +11,12 @@ top level.
 import re
 import unicodedata
 
+try:
+    from .i18n import tr
+except ImportError:  # loaded on its own (unit tests): English only
+    def tr(text):
+        return text
+
 DEFAULT_SEPARATOR = "/"
 
 _NUM_RE = re.compile(r"(\d+)")
@@ -170,10 +176,10 @@ def compose(folder, text, sep=DEFAULT_SEPARATOR, spaced=False):
     """
     raw = f"{sep.join(folder)}{sep}{text}" if (folder and sep) else text
     if not text.strip():
-        return "", "The name cannot be empty."
+        return "", tr("The name cannot be empty.")
     if sep and sep in text and any(not p.strip() for p in text.split(sep)):
-        return "", (f"Folder and theme names cannot be empty — check for a doubled, "
-                    f"leading or trailing “{sep}”.")
+        return "", tr("Folder and theme names cannot be empty — check for a doubled, "
+                          "leading or trailing “{}”.").format(sep)
     return normalize(raw, sep, spaced), None
 
 
@@ -251,13 +257,13 @@ def remap_order_for_folder_move(order, old, new, glue="\x1f"):
 def validate_name(name, existing, sep=DEFAULT_SEPARATOR, ignore=None):
     """Return an error message for an unusable new theme name, else ``None``."""
     if not name or not name.strip():
-        return "The name cannot be empty."
+        return tr("The name cannot be empty.")
     if sep and sep in name:
         if any(not p.strip() for p in name.split(sep)):
-            return (f"Folder and theme names cannot be empty — check for a doubled, "
-                    f"leading or trailing “{sep}”.")
+            return tr("Folder and theme names cannot be empty — check for a doubled, "
+                      "leading or trailing “{}”.").format(sep)
     if name in existing and name != ignore:
-        return "A theme with this name already exists."
+        return tr("A theme with this name already exists.")
     return None
 
 
@@ -274,12 +280,12 @@ def check_batch(mapping, existing, sep=DEFAULT_SEPARATOR):
     """Validate a batch rename (old -> new). Returns an error message or None."""
     targets = list(mapping.values())
     if len(set(targets)) != len(targets):
-        return "Two themes would end up with the same name."
+        return tr("Two themes would end up with the same name.")
     sources = set(mapping)
     for old, new in mapping.items():
         err = validate_name(new, set(), sep)
         if err:
             return f"“{new}”: {err}"
         if new in existing and new not in sources:
-            return f"A theme called “{new}” already exists."
+            return tr("A theme called “{}” already exists.").format(new)
     return None

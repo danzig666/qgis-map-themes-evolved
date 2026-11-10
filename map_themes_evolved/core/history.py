@@ -21,6 +21,7 @@ from qgis.PyQt.QtXml import QDomDocument
 from qgis.core import QgsMapThemeCollection
 
 from . import paths
+from .i18n import tr
 from .service import SCOPE
 
 HISTORY_ENTRY = "history"
@@ -222,7 +223,7 @@ class VisibilityHistory(QObject):
         coll = self.service.collection
         for name in sorted(coll.mapThemes(), key=paths.natural_key):
             if coll.mapThemeState(name) == record:
-                return f"Theme “{name}”"
+                return tr("Theme “{}”").format(name)
         return None
 
     def _label(self, record, key):
@@ -230,7 +231,7 @@ class VisibilityHistory(QObject):
         if theme:
             return theme
         if not self.entries:
-            return "Start"
+            return tr("Start")
         old_layers, old_groups = self.current.key
         new_layers, new_groups = key
         old_ids = {lid for lid, _ in old_layers}
@@ -249,14 +250,14 @@ class VisibilityHistory(QObject):
 
         shown, hidden = new_ids - old_ids, old_ids - new_ids
         if shown:
-            parts.append("Shown: " + names(shown))
+            parts.append(tr("Shown: {}").format(names(shown)))
         if hidden:
-            parts.append("Hidden: " + names(hidden))
+            parts.append(tr("Hidden: {}").format(names(hidden)))
         g_on, g_off = new_groups - old_groups, old_groups - new_groups
         if g_on:
-            parts.append("Groups on: " + ", ".join(sorted(g.split("/")[-1] for g in g_on)[:_LABEL_NAMES]))
+            parts.append(tr("Groups on: {}").format(", ".join(sorted(g.split("/")[-1] for g in g_on)[:_LABEL_NAMES])))
         if g_off:
-            parts.append("Groups off: " + ", ".join(sorted(g.split("/")[-1] for g in g_off)[:_LABEL_NAMES]))
+            parts.append(tr("Groups off: {}").format(", ".join(sorted(g.split("/")[-1] for g in g_off)[:_LABEL_NAMES])))
         if not parts and new_layers != old_layers:
-            parts.append("Legend items changed")
-        return " · ".join(parts) or "Layer visibility changed"
+            parts.append(tr("Legend items changed"))
+        return " · ".join(parts) or tr("Layer visibility changed")

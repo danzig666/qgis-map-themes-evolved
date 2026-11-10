@@ -2,7 +2,6 @@
 
 import os
 
-from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QPushButton
 from qgis.core import Qgis, QgsApplication, QgsMessageLog
@@ -25,8 +24,7 @@ def event_global_pos(event):
     return event.globalPosition().toPoint() if hasattr(event, "globalPosition") else event.globalPos()
 
 
-def tr(text):
-    return QCoreApplication.translate("MapThemesEvolved", text)
+from ..core.i18n import tr  # noqa: E402,F401  (JSON translations, see core/i18n.py)
 
 
 def icon(name):
