@@ -33,8 +33,8 @@ Click the **eye button** in the Layers panel.
 - **New theme** and **New folder** add a row you type the name into. Type `Area/Topic/Name` to create subfolders on the fly.
 - **Theme edits** (rename, move, group, delete, reorder…) can be undone from the message bar's *Undo* link or *⋯ ▸ Undo last theme edit*.
 - **Open as panel** (window icon) docks the same browser beside the map, which is handy for longer organising sessions.
-- **Window position:** drag the popup by its title bar and it reopens there. Double-click the title bar to put it back under the eye button. The popup and panel positions are saved in your QGIS settings, not the project. If a monitor is unplugged or the resolution changes, they're moved back onto a visible screen.
-- The **Layers:** row holds QGIS's own Show All / Hide All / Show Selected… actions, unchanged.
+- **Window position and size:** drag the popup by its title bar and it reopens there. Resize it by dragging its left, right or bottom edge, or the bottom-right corner. Double-click the title bar to put it back under the eye button. The popup and panel positions are saved in your QGIS settings, not the project. If a monitor is unplugged or the resolution changes, they're moved back onto a visible screen.
+- The **Layers:** row holds QGIS's own Show All / Hide All / Show Selected… actions, unchanged. The less common ones (Toggle Selected Layers, Hide Deselected Layers…) are in the **⋯** menu.
 - **Right-click the eye button**, or use *⋯ ▸ Classic QGIS map themes menu*, for the original menu.
 
 | Key | Action |

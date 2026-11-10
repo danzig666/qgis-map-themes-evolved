@@ -278,12 +278,17 @@ class ThemeBrowser(QWidget):
             more_menu.addAction(tr("Classic QGIS map themes menu"), self._open_classic_menu)
         more_menu.addAction(theme_icon("expand"), tr("Expand all folders"), self._expand_all)
         more_menu.addAction(theme_icon("collapse"), tr("Collapse all folders"), self._collapse_all)
+        native = find_native_actions(self.iface)
+        extra = [native[n] for n in NATIVE_MORE if n in native]
+        if extra:  # the less common native layer actions live here (one "more" menu only)
+            more_menu.addSection(tr("Layers"))
+            for a in extra:
+                more_menu.addAction(a)
         more.setMenu(more_menu)
         row1.addWidget(more)
         lay.addLayout(row1)
 
         # bottom: native layer visibility actions ------------------------------
-        native = find_native_actions(self.iface)
         if native:
             row2 = QHBoxLayout()
             row2.setSpacing(1)
@@ -293,18 +298,6 @@ class ThemeBrowser(QWidget):
             for name in NATIVE_PRIMARY:
                 if name in native:
                     row2.addWidget(self._tool_button(native[name]))
-            extra = [native[n] for n in NATIVE_MORE if n in native]
-            if extra:
-                btn = QToolButton(self)
-                btn.setAutoRaise(True)
-                btn.setText("…")
-                btn.setToolTip(tr("More layer visibility actions"))
-                btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-                m = QMenu(btn)
-                for a in extra:
-                    m.addAction(a)
-                btn.setMenu(m)
-                row2.addWidget(btn)
             row2.addStretch(1)
             lay.addLayout(row2)
         self._update_actions()
