@@ -5,7 +5,7 @@ qgisMaximumVersion=4.99
 supportsQt6=True
 description=Searchable, folder-based map theme browser on the Layers panel eye button — fully compatible with native map themes.
 about=Replaces the flat "Manage Map Themes" menu with a popup that has instant search, nested folders, drag and drop and one-click "Update theme". Folders are just part of the theme name ("Area/Topic/Theme"), so projects stay 100% compatible with plain QGIS: nothing is stored besides the normal map themes. Includes undo, a dockable panel, and keeps all native layer-visibility actions plus the classic menu (right-click the eye button).
-version=0.5.0
+version=0.6.0
 author=danzig666
 email=5346511+danzig666@users.noreply.github.com
 tags=map themes,visibility presets,layers,search,folders,organisation
@@ -17,7 +17,8 @@ tracker=https://github.com/danzig666/qgis-map-themes-evolved/issues
 experimental=True
 deprecated=False
 hasProcessingProvider=no
-changelog=0.5.0 Folder open/closed state is saved in the project (MapThemesEvolved/expanded) instead of the QGIS settings.
+changelog=0.6.0 The layer visibility history (undo/redo of layer visibility) is saved in the project (MapThemesEvolved/history) and restored when the project is reopened.
+    0.5.0 Folder open/closed state is saved in the project (MapThemesEvolved/expanded) instead of the QGIS settings.
     0.4.4 Documentation and test examples use made-up place names only.
     0.4.3 Status line: Update / Save as new moved to their own row so the status text is never cut off; themes being grouped stay highlighted while the folder name is typed; README screenshots.
     0.4.2 Fix: the popup sometimes stayed open after applying a theme (a delayed slow-click rename left a hidden editor behind) — slow-click rename removed (use F2), double-click detection made reliable, unfinished names are cancelled when the popup closes; fixed a possible crash in the folder menu's Expand/Collapse inside.

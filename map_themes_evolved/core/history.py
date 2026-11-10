@@ -5,15 +5,26 @@ is captured as a map theme record — the same thing a map theme stores. The
 user can jump back to any of the recent states, which makes an accidental
 "Hide All" or a mis-click in the Layers panel harmless.
 
-History lives only in memory for the current project; nothing is written to
-the project file.
+The history is saved in the project (custom property
+``MapThemesEvolved/history``: JSON with labels, times, the current position and
+the records as zlib-compressed map-theme XML), so undo still works after the
+project is closed and reopened. QGIS without the plugin ignores it.
 """
 
+import base64
+import json
 import time
+import zlib
 
 from qgis.PyQt.QtCore import QObject, QTimer, pyqtSignal
+from qgis.PyQt.QtXml import QDomDocument
+from qgis.core import QgsMapThemeCollection
 
 from . import paths
+from .service import SCOPE
+
+HISTORY_ENTRY = "history"
+_FORMAT = 1
 
 HISTORY_LIMIT = 30
 _LABEL_NAMES = 3
@@ -34,11 +45,11 @@ def state_key(record):
 class HistoryEntry:
     __slots__ = ("record", "key", "label", "when")
 
-    def __init__(self, record, key, label):
+    def __init__(self, record, key, label, when=None):
         self.record = record
         self.key = key
         self.label = label
-        self.when = time.time()
+        self.when = time.time() if when is None else when
 
     def time_text(self):
         return time.strftime("%H:%M:%S", time.localtime(self.when))
@@ -64,6 +75,7 @@ class VisibilityHistory(QObject):
         self._root = service.project.layerTreeRoot()
         self._root.visibilityChanged.connect(self._schedule)
         service.projectReset.connect(self._on_project_reset)
+        self._load()
         self._timer.start()  # baseline
 
     def shutdown(self):
@@ -78,10 +90,62 @@ class VisibilityHistory(QObject):
             self._timer.start()
 
     def _on_project_reset(self):
-        self.entries = []
-        self.index = -1
+        self._load()
         self._timer.start()  # new baseline once the project has loaded
         self.changed.emit()
+
+    # ------------------------------------------------------------------
+    # saving in the project
+    # ------------------------------------------------------------------
+    def _save(self):
+        project = self.service.project
+        if len(self.entries) < 2 and not project.readEntry(SCOPE, HISTORY_ENTRY, "")[1]:
+            return  # just a baseline: nothing to undo, don't mark the project modified
+        coll = QgsMapThemeCollection(project)  # scratch collection, not the project's
+        for i, entry in enumerate(self.entries):
+            coll.insert(f"h{i}", entry.record)
+        doc = QDomDocument("qgis")
+        doc.appendChild(doc.createElement("qgis"))
+        coll.writeXml(doc)
+        xml = doc.toString(-1).encode("utf-8")
+        data = {
+            "format": _FORMAT,
+            "index": self.index,
+            "entries": [[e.label, round(e.when)] for e in self.entries],
+            "records": base64.b64encode(zlib.compress(xml, 9)).decode("ascii"),
+        }
+        project.writeEntry(SCOPE, HISTORY_ENTRY, json.dumps(data, ensure_ascii=False))
+
+    def _load(self):
+        """Replace the history with the one stored in the project (if any)."""
+        self.entries = []
+        self.index = -1
+        project = self.service.project
+        raw, ok = project.readEntry(SCOPE, HISTORY_ENTRY, "")
+        if not (ok and raw):
+            return
+        try:
+            data = json.loads(raw)
+            if data.get("format") != _FORMAT:
+                return
+            xml = zlib.decompress(base64.b64decode(data["records"])).decode("utf-8")
+            doc = QDomDocument()
+            if not doc.setContent(xml)[0]:
+                return
+            coll = QgsMapThemeCollection(project)
+            coll.readXml(doc)
+            entries = []
+            for i, (label, when) in enumerate(data["entries"]):
+                name = f"h{i}"
+                if not coll.hasMapTheme(name):
+                    continue
+                record = coll.mapThemeState(name)
+                entries.append(HistoryEntry(record, state_key(record), str(label), float(when)))
+            index = int(data.get("index", len(entries) - 1))
+        except (ValueError, TypeError, KeyError, zlib.error):
+            return  # unreadable history is simply dropped
+        self.entries = entries[-self.limit:]
+        self.index = max(-1, min(index - (len(entries) - len(self.entries)), len(self.entries) - 1))
 
     # ------------------------------------------------------------------
     @property
@@ -119,6 +183,7 @@ class VisibilityHistory(QObject):
         if overflow > 0:
             del self.entries[:overflow]
         self.index = len(self.entries) - 1
+        self._save()
         self.changed.emit()
 
     def undo(self):
@@ -144,6 +209,7 @@ class VisibilityHistory(QObject):
             self._applying = False
         self._timer.stop()
         self.index = i
+        self._save()
         self.changed.emit()
         return entry
 

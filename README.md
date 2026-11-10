@@ -28,7 +28,7 @@ Click the **eye button** in the Layers panel.
 - **Right-click** a theme or folder for everything else: update, rename, **Move to ▸**, duplicate, copy name, delete, and new theme or subfolder here.
 - **Drag** themes or folders onto a folder to move them, or onto empty space to move them to the top level.
 - **Group:** select several themes, then press **Group…** (or Ctrl+G, or right-click) and type the folder name right in the list. The items move into it, and the new folder appears where the first of them was. Typing an existing folder's name moves them into that folder.
-- **Undo layer visibility:** the **↶** button next to the status line (or **Ctrl+Z**) steps the layer checkboxes back one change, and **↷** (Ctrl+Y) redoes. This undoes an accidental *Hide All*, a mis-click in the Layers panel, or applying the wrong theme. The **▾** arrow lists the last 30 states (e.g. "Hidden: roads", "Theme “X”") to jump to directly. Your saved themes are never changed by this. The actions are also in *Plugins ▸ Map Themes Evolved*, where you can give them global shortcuts.
+- **Undo layer visibility:** the **↶** button next to the status line (or **Ctrl+Z**) steps the layer checkboxes back one change, and **↷** (Ctrl+Y) redoes. This undoes an accidental *Hide All*, a mis-click in the Layers panel, or applying the wrong theme. The **▾** arrow lists the last 30 states (e.g. "Hidden: roads", "Theme “X”") to jump to directly. Your saved themes are never changed by this. The history is saved with the project, so you can still undo after reopening it. The actions are also in *Plugins ▸ Map Themes Evolved*, where you can give them global shortcuts.
 - **Reorder:** drag a folder or theme *between* rows to put it there. Dropping *onto* a folder moves the item into it. Folders and themes can be mixed in any order, like in the Layers panel, and dropping on the empty space below the list moves an item to the end. The custom order is saved in the project (see Compatibility); anything you haven't placed keeps natural sorting.
 - **New theme** and **New folder** add a row you type the name into. Type `Area/Topic/Name` to create subfolders on the fly.
 - **Theme edits** (rename, move, group, delete, reorder…) can be undone from the message bar's *Undo* link or *⋯ ▸ Undo last theme edit*.
@@ -56,10 +56,11 @@ You can assign a shortcut to *Browse Map Themes…* in *Settings ▸ Keyboard Sh
 
 - Reads and writes only through QGIS's own map-theme API (`QgsMapThemeCollection`).
 - Renames use `renameMapTheme`, so **print layouts that follow a theme are updated by QGIS itself**. Data-defined theme expressions are *not* updated by QGIS. Check those after renaming.
-- The plugin stores two extra things in the project, as project properties that QGIS without the plugin ignores:
+- The plugin stores three extra things in the project, as project properties that QGIS without the plugin ignores:
   - your **custom order** (`MapThemesEvolved/order`), once you reorder something;
   - which **folders are open or closed** (`MapThemesEvolved/expanded`), so the tree looks the same when you (or a colleague) open the project again. Opening or closing a folder therefore marks the project as changed; it's saved with the next project save.
-- Window positions and the layer visibility history are never stored in the project. Window positions are in your QGIS settings; the history lasts only for the session.
+  - the **layer visibility history** (`MapThemesEvolved/history`, the last 30 states, compressed), so ↶ / ↷ still work after you close and reopen the project. Nothing is written until there is something to undo.
+- Window positions are never stored in the project; they're in your QGIS settings. The undo list for theme edits (rename, move, delete…) lasts only for the session.
 - Disabling the plugin restores the original eye-button menu immediately.
 
 Tested on QGIS 3.44 (Qt5). It's written to also work on QGIS 4.x (Qt6), but that hasn't been tested yet.
