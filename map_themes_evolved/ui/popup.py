@@ -8,9 +8,9 @@ under the eye button.
 
 import time
 
-from qgis.PyQt.QtCore import QPoint, QRect, QSize, Qt
+from qgis.PyQt.QtCore import QEvent, QPoint, QRect, QSize, Qt
 from qgis.PyQt.QtGui import QPainter
-from qgis.PyQt.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel, QStyle, QStyleOption,
+from qgis.PyQt.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel, QMenu, QStyle, QStyleOption,
                                  QVBoxLayout, QWidget)
 
 from . import geometry
@@ -20,7 +20,11 @@ from .common import event_global_pos, theme_icon, tr
 DEFAULT_SIZE = QSize(400, 540)
 MIN_SIZE = QSize(280, 260)
 GEOMETRY_NAME = "popup"
-EDGE = 5  # px of the popup border that resize when dragged
+EDGE = 1  # visible border (px) left, right and bottom, besides the frame line
+GRAB = 6  # px from the window edge that resize when dragged (also over the content)
+_CURSORS = {"l": Qt.CursorShape.SizeHorCursor, "r": Qt.CursorShape.SizeHorCursor,
+            "b": Qt.CursorShape.SizeVerCursor, "lb": Qt.CursorShape.SizeBDiagCursor,
+            "rb": Qt.CursorShape.SizeFDiagCursor}
 
 
 class _TitleBar(QWidget):
@@ -104,10 +108,11 @@ class ThemePopup(QFrame):
         saved = geometry.load_raw(GEOMETRY_NAME) or {}
         self.moved_by_user = bool(saved.get("moved"))
         self._resizing = None  # (edges, start global pos, start geometry)
+        self._override_cursor = None
         self.setMouseTracking(True)
 
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(EDGE, 0, EDGE, EDGE)  # the margins are the resize edges
+        lay.setContentsMargins(EDGE, 0, EDGE, EDGE)
         lay.setSpacing(0)
         lay.addWidget(_TitleBar(self))
         self.browser = ThemeBrowser(service, undo, notifier, iface, host=self,
@@ -132,13 +137,50 @@ class ThemePopup(QFrame):
         if not self.rect().contains(pos):
             return ""
         edges = ""
-        if pos.x() < EDGE:
+        if pos.x() < GRAB:
             edges += "l"
-        elif pos.x() >= self.width() - EDGE:
+        elif pos.x() >= self.width() - GRAB:
             edges += "r"
-        if pos.y() >= self.height() - EDGE:
+        if pos.y() >= self.height() - GRAB:
             edges += "b"
         return edges
+
+    def _set_edge_cursor(self, edges):
+        shape = _CURSORS.get(edges)
+        if shape == self._override_cursor:
+            return
+        if self._override_cursor is not None:
+            QApplication.restoreOverrideCursor()
+        if shape is not None:
+            QApplication.setOverrideCursor(shape)
+        self._override_cursor = shape
+
+    def eventFilter(self, obj, event):
+        """The border is thin, so the resize zone reaches a few px into the content."""
+        et = event.type()
+        if et not in (QEvent.Type.MouseMove, QEvent.Type.MouseButtonPress, QEvent.Type.MouseButtonRelease):
+            return False
+        if not (obj is self or (obj.isWidgetType() and self.isAncestorOf(obj))):
+            return False
+        if isinstance(QApplication.activePopupWidget(), QMenu):  # a context menu is open
+            return False
+        if self._resizing is not None:
+            if et == QEvent.Type.MouseMove:
+                self.resize_to(event_global_pos(event))
+            elif et == QEvent.Type.MouseButtonRelease:
+                self.end_resize()
+            return True
+        edges = self._edges_at(event_global_pos(event) - self.geometry().topLeft())
+        if et == QEvent.Type.MouseMove and not event.buttons():
+            self._set_edge_cursor(edges)
+        elif et == QEvent.Type.MouseButtonPress and edges and event.button() == Qt.MouseButton.LeftButton:
+            self.start_resize(edges, event_global_pos(event))
+            return True
+        return False
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        QApplication.instance().installEventFilter(self)
 
     def start_resize(self, edges, global_pos):
         self._resizing = (edges, global_pos, self.geometry())
@@ -163,35 +205,6 @@ class ThemePopup(QFrame):
         if self._resizing is not None:
             self._resizing = None
             self._save()
-
-    def mousePressEvent(self, event):
-        edges = self._edges_at(event.pos())
-        if edges and event.button() == Qt.MouseButton.LeftButton:
-            self.start_resize(edges, event_global_pos(event))
-            event.accept()
-            return
-        super().mousePressEvent(event)
-
-    def mouseMoveEvent(self, event):
-        if self._resizing is not None:
-            self.resize_to(event_global_pos(event))
-            event.accept()
-            return
-        shape = {"l": Qt.CursorShape.SizeHorCursor, "r": Qt.CursorShape.SizeHorCursor,
-                 "b": Qt.CursorShape.SizeVerCursor, "lb": Qt.CursorShape.SizeBDiagCursor,
-                 "rb": Qt.CursorShape.SizeFDiagCursor}.get(self._edges_at(event.pos()))
-        if shape is None:
-            self.unsetCursor()
-        else:
-            self.setCursor(shape)
-        super().mouseMoveEvent(event)
-
-    def mouseReleaseEvent(self, event):
-        if self._resizing is not None:
-            self.end_resize()
-            event.accept()
-            return
-        super().mouseReleaseEvent(event)
 
     # ------------------------------------------------------------------
     def open_under(self, widget):
@@ -251,6 +264,9 @@ class ThemePopup(QFrame):
         geometry.save_geometry(GEOMETRY_NAME, self.geometry(), {"moved": self.moved_by_user})
 
     def hideEvent(self, event):
+        QApplication.instance().removeEventFilter(self)
+        self._set_edge_cursor("")
+        self._resizing = None
         self.browser.cancel_editing()  # never leave a half-typed name behind
         self._save()
         self.last_hidden = time.monotonic()

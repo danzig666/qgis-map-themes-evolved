@@ -121,7 +121,10 @@ class ThemeBrowser(QWidget):
     # ------------------------------------------------------------------
     def _build_ui(self):
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(6, 6, 6, 6)
+        if self.host is not None:  # the popup draws its own thin border
+            lay.setContentsMargins(0, 4, 0, 0)
+        else:
+            lay.setContentsMargins(6, 6, 6, 6)
         lay.setSpacing(4)
 
         # search row ----------------------------------------------------------

@@ -5,7 +5,7 @@ qgisMaximumVersion=4.99
 supportsQt6=True
 description=Searchable, folder-based map theme browser on the Layers panel eye button — fully compatible with native map themes.
 about=Replaces the flat "Manage Map Themes" menu with a popup that has instant search, nested folders, drag and drop and one-click "Update theme". Folders are just part of the theme name ("Area/Topic/Theme"), so projects stay 100% compatible with plain QGIS: the themes remain normal map themes, and the plugin's extras (custom order, open folders, highlight colors, layer visibility history) are separate project properties that QGIS ignores. English and Hungarian. Includes undo, a dockable panel, and keeps all native layer-visibility actions plus the classic menu (right-click the eye button).
-version=0.8.0
+version=0.8.1
 author=danzig666
 email=5346511+danzig666@users.noreply.github.com
 tags=map themes,visibility presets,layers,search,folders,organisation
@@ -17,7 +17,8 @@ tracker=https://github.com/danzig666/qgis-map-themes-evolved/issues
 experimental=True
 deprecated=False
 hasProcessingProvider=no
-changelog=0.8.0 Highlight colors for themes and folders (right-click ▸ Highlight color), like LayerColorPlugin; saved in the project, follow renames/moves, undoable.
+changelog=0.8.1 Thinner popup borders on the left, right and bottom; the window still resizes from a few px inside its edge.
+    0.8.0 Highlight colors for themes and folders (right-click ▸ Highlight color), like LayerColorPlugin; saved in the project, follow renames/moves, undoable.
     0.7.0 Hungarian translation; the plugin follows QGIS's interface language. Translations are simple JSON files (see README).
     0.6.2 Clicking outside the popup closes it again (0.6.1 took clicks to its left, right or below as a resize).
     0.6.1 Popup can be resized again (edges and corner; the old size grip did nothing on Windows); one ⋯ menu instead of two.
