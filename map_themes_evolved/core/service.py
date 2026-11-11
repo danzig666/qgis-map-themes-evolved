@@ -16,6 +16,13 @@ from . import paths
 from .i18n import tr
 
 SCOPE = "MapThemesEvolved"
+
+
+def color_key(kind, value):
+    """Key in the color table: ``t:<theme name>`` or ``f:<folder key>``."""
+    return ("t:" if kind == "theme" else "f:") + value
+
+
 TMP_PREFIX = "⁣mte-tmp-"
 ORDER_GLUE = "\x1f"  # same glue as ui.model.FOLDER_GLUE
 
@@ -37,6 +44,8 @@ class ThemeService(QObject):
         self.last_applied = None
         #: custom order per folder key (see paths.reorder); saved in the project
         self._order = {}
+        #: highlight colors: "t:<theme name>" / "f:<folder key>" -> "#rrggbb"; saved in the project
+        self._colors = {}
 
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
@@ -47,6 +56,7 @@ class ThemeService(QObject):
         self._project.readProject.connect(self._on_project_reset)
         self._project.cleared.connect(self._on_project_reset)
         self._load_order()
+        self._load_colors()
         self._attach_collection()
 
     # ------------------------------------------------------------------
@@ -66,6 +76,11 @@ class ThemeService(QObject):
     def _follow_rename(self, old, new):
         if self.last_applied == old:
             self.last_applied = new
+        # the color follows the theme (also through rename_many's temporary names)
+        color = self._colors.pop(color_key("theme", old), None)
+        if color:
+            self._colors[color_key("theme", new)] = color
+            self._write_colors()
         # keep a renamed theme's custom position (also for renames made elsewhere)
         if old.startswith(TMP_PREFIX) or new.startswith(TMP_PREFIX):
             return
@@ -99,6 +114,7 @@ class ThemeService(QObject):
         self.session_folders.clear()
         self.last_applied = None
         self._load_order()
+        self._load_colors()
         self.projectReset.emit()
         self._schedule()
 
@@ -194,11 +210,59 @@ class ThemeService(QObject):
         return previous
 
     def move_folder_order(self, old, new):
-        """Carry a folder's (and its subfolders') custom order along a rename/move."""
-        if not self._order:
-            return
-        self._order = paths.remap_order_for_folder_move(self._order, tuple(old), tuple(new), ORDER_GLUE)
-        self._write_order()
+        """Carry a folder's (and its subfolders') custom order and colors along a rename/move."""
+        old, new = tuple(old), tuple(new)
+        if self._order:
+            self._order = paths.remap_order_for_folder_move(self._order, old, new, ORDER_GLUE)
+            self._write_order()
+        moved = {}
+        for key in list(self._colors):
+            if key.startswith("f:"):
+                folder = tuple(key[2:].split(ORDER_GLUE))
+                if folder[:len(old)] == old:
+                    moved[color_key("folder", ORDER_GLUE.join(new + folder[len(old):]))] = self._colors.pop(key)
+        if moved:
+            self._colors.update(moved)
+            self._write_colors()
+
+    # ------------------------------------------------------------------
+    # highlight colors (project custom property "MapThemesEvolved/colors")
+    # ------------------------------------------------------------------
+    def _load_colors(self):
+        raw, ok = self._project.readEntry(SCOPE, "colors", "")
+        try:
+            data = json.loads(raw) if ok and raw else {}
+        except ValueError:
+            data = {}
+        self._colors = {str(k): str(v) for k, v in data.items()
+                        if isinstance(v, str) and str(k)[:2] in ("t:", "f:")} if isinstance(data, dict) else {}
+
+    def _write_colors(self):
+        self._project.writeEntry(SCOPE, "colors", json.dumps(self._colors, ensure_ascii=False, sort_keys=True))
+
+    def color_of(self, kind, value):
+        """Highlight color (``#rrggbb``) of a theme (full name) or folder (folder key), or None."""
+        return self._colors.get(color_key(kind, value))
+
+    def set_colors(self, items, color):
+        """Give (kind, value) items a color (``None`` removes it). Returns the previous state for undo."""
+        previous = {color_key(k, v): self._colors.get(color_key(k, v)) for k, v in items}
+        self.restore_colors({key: color for key in previous})
+        return previous
+
+    def restore_colors(self, mapping):
+        """Set colors from a {color key: color or None} mapping (see set_colors)."""
+        changed = False
+        for key, color in mapping.items():
+            if color:
+                changed |= self._colors.get(key) != color
+                self._colors[key] = color
+            elif key in self._colors:
+                del self._colors[key]
+                changed = True
+        if changed:
+            self._write_colors()
+            self._schedule()
 
     # ------------------------------------------------------------------
     # reading

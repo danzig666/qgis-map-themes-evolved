@@ -202,6 +202,10 @@ class ThemePopup(QFrame):
         self._anchor, self._anchor_pos = None, global_pos
         self._open(prepare=True)
 
+    def reopen(self):
+        """Show again where it was (e.g. after a dialog that had to hide it)."""
+        self._open(prepare=False)
+
     def reset_position(self):
         self.moved_by_user = False
         self.setGeometry(self._anchored_rect())

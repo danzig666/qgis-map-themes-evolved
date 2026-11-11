@@ -31,7 +31,8 @@ Click the **eye button** in the Layers panel.
 - **Undo layer visibility:** the **↶** button next to the status line (or **Ctrl+Z**) steps the layer checkboxes back one change, and **↷** (Ctrl+Y) redoes. This undoes an accidental *Hide All*, a mis-click in the Layers panel, or applying the wrong theme. The **▾** arrow lists the last 30 states (e.g. "Hidden: roads", "Theme “X”") to jump to directly. Your saved themes are never changed by this. The history is saved with the project, so you can still undo after reopening it. The actions are also in *Plugins ▸ Map Themes Evolved*, where you can give them global shortcuts.
 - **Reorder:** drag a folder or theme *between* rows to put it there. Dropping *onto* a folder moves the item into it. Folders and themes can be mixed in any order, like in the Layers panel, and dropping on the empty space below the list moves an item to the end. The custom order is saved in the project (see Compatibility); anything you haven't placed keeps natural sorting.
 - **New theme** and **New folder** add a row you type the name into. Type `Area/Topic/Name` to create subfolders on the fly.
-- **Theme edits** (rename, move, group, delete, reorder…) can be undone from the message bar's *Undo* link or *⋯ ▸ Undo last theme edit*.
+- **Highlight colors:** right-click a theme or folder (or several selected ones) ▸ **Highlight color** to give the rows a background color, like [LayerColorPlugin](https://github.com/danzig666/LayerColorPlugin) does for layers. Pick a swatch (light pastels keep names easy to read), or *Custom color…*. *Copy color* / *Paste color* reuse a color, and *Remove color* clears it. The text turns black or white automatically for contrast (WCAG 2.0). Colors stay with themes and folders when you rename or move them, and color changes can be undone.
+- **Theme edits** (rename, move, group, delete, reorder, colors…) can be undone from the message bar's *Undo* link or *⋯ ▸ Undo last theme edit*.
 - **Open as panel** (window icon) docks the same browser beside the map, which is handy for longer organising sessions.
 - **Window position and size:** drag the popup by its title bar and it reopens there. Resize it by dragging its left, right or bottom edge, or the bottom-right corner. Double-click the title bar to put it back under the eye button. The popup and panel positions are saved in your QGIS settings, not the project. If a monitor is unplugged or the resolution changes, they're moved back onto a visible screen.
 - The **Layers:** row holds QGIS's own Show All / Hide All / Show Selected… actions, unchanged. The less common ones (Toggle Selected Layers, Hide Deselected Layers…) are in the **⋯** menu.
@@ -56,9 +57,10 @@ You can assign a shortcut to *Browse Map Themes…* in *Settings ▸ Keyboard Sh
 
 - Reads and writes only through QGIS's own map-theme API (`QgsMapThemeCollection`).
 - Renames use `renameMapTheme`, so **print layouts that follow a theme are updated by QGIS itself**. Data-defined theme expressions are *not* updated by QGIS. Check those after renaming.
-- The plugin stores three extra things in the project, as project properties that QGIS without the plugin ignores:
+- The plugin stores four extra things in the project, as project properties that QGIS without the plugin ignores:
   - your **custom order** (`MapThemesEvolved/order`), once you reorder something;
   - which **folders are open or closed** (`MapThemesEvolved/expanded`), so the tree looks the same when you (or a colleague) open the project again. Opening or closing a folder therefore marks the project as changed; it's saved with the next project save.
+  - **highlight colors** of themes and folders (`MapThemesEvolved/colors`);
   - the **layer visibility history** (`MapThemesEvolved/history`, the last 30 states, compressed), so ↶ / ↷ still work after you close and reopen the project. Nothing is written until there is something to undo.
 - Window positions are never stored in the project; they're in your QGIS settings. The undo list for theme edits (rename, move, delete…) lasts only for the session.
 - Disabling the plugin restores the original eye-button menu immediately.

@@ -9,9 +9,10 @@ from the collection.
 import json
 
 from qgis.PyQt.QtCore import QMimeData, Qt, pyqtSignal
-from qgis.PyQt.QtGui import QStandardItem, QStandardItemModel
+from qgis.PyQt.QtGui import QBrush, QColor, QStandardItem, QStandardItemModel
 
 from ..core import paths
+from .colors import text_color_for
 from .common import theme_icon, tr
 
 KIND_ROLE = Qt.ItemDataRole.UserRole + 1   # "folder" | "theme" | "new-theme" | "new-folder"
@@ -235,6 +236,7 @@ class ThemeTreeModel(QStandardItemModel):
                 self._flags(it, "folder")
                 if path in marked_folders:
                     _bold(it)
+                self._paint(it, self.service.color_of("folder", folder_to_key(path)))
                 parent_item.appendRow(it)
                 self.items_by_key[("folder", folder_to_key(path))] = it
                 self._fill(it, node["folders"][seg], path, current, modified, marked_folders, placeholder)
@@ -252,10 +254,18 @@ class ThemeTreeModel(QStandardItemModel):
                 self._flags(it, "theme")
                 if name in current or name == modified:
                     _bold(it)
+                self._paint(it, self.service.color_of("theme", name))
                 parent_item.appendRow(it)
                 self.items_by_key[("theme", name)] = it
         if placeholder and tuple(placeholder[1]) == folder:
             self._add_placeholder(parent_item, placeholder)  # typed-in new item goes last
+
+    @staticmethod
+    def _paint(item, color):
+        """Highlight color: row background, text in black or white for contrast."""
+        if color and QColor(color).isValid():
+            item.setBackground(QBrush(QColor(color)))
+            item.setForeground(QBrush(text_color_for(color)))
 
     def _add_placeholder(self, parent_item, placeholder):
         kind, folder, text = placeholder

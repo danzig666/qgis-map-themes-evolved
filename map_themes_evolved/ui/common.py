@@ -89,6 +89,10 @@ class Notifier:
             except RuntimeError:  # widget already deleted
                 self.listeners.remove(fn)
 
+    def changed(self):
+        """Something undoable happened without a message (refresh Undo buttons)."""
+        self._notify_listeners()
+
     def done(self, text, op_id=None):
         self._notify_listeners()
         bar = self.iface.messageBar()

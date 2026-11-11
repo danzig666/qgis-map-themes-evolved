@@ -20,14 +20,15 @@ import hashlib
 import json
 
 from qgis.PyQt.QtCore import QEvent, QItemSelectionModel, QPoint, Qt, QTimer, pyqtSignal
-from qgis.PyQt.QtGui import QBrush, QPalette
+from qgis.PyQt.QtGui import QBrush, QColor, QPalette
 from qgis.PyQt.QtWidgets import (QAbstractItemDelegate, QAbstractItemView, QApplication, QFrame,
                                  QHBoxLayout, QLabel, QLineEdit, QMenu, QSizePolicy, QToolButton,
                                  QTreeView, QVBoxLayout, QWidget)
 from qgis.core import QgsSettings
-from qgis.gui import QgsFilterLineEdit
+from qgis.gui import QgsColorDialog, QgsFilterLineEdit
 
 from ..core import paths
+from .colors import add_color_menu
 from .common import SETTINGS_PREFIX, QAction, event_pos, theme_icon, tr
 from .model import KIND_ROLE, NAME_ROLE, PATH_ROLE, ThemeTreeModel, folder_to_key, item_key, key_to_folder
 
@@ -728,6 +729,7 @@ class ThemeBrowser(QWidget):
                 self._add_move_menu(m, [key])
             m.addAction(theme_icon("duplicate"), tr("Duplicate"), lambda: self.duplicate_theme(name))
             m.addAction(theme_icon("copy"), tr("Copy name"), lambda: QApplication.clipboard().setText(name))
+            add_color_menu(m, self, [key])
             m.addSeparator()
             m.addAction(theme_icon("delete"), tr("Delete") + "\tDel", lambda: self.delete_themes([name]))
         elif kind == "folder":
@@ -739,6 +741,7 @@ class ThemeBrowser(QWidget):
             m.addSeparator()
             m.addAction(theme_icon("rename"), tr("Rename") + "\tF2", lambda: self._start_edit(key))
             self._add_move_menu(m, [key], exclude=folder)
+            add_color_menu(m, self, [key])
             m.addAction(theme_icon("delete"), tr("Delete folder…") + "\tDel", lambda: self.delete_folder(folder))
             m.addSeparator()
             # look the row up again when the action runs: the list may have been
@@ -769,10 +772,38 @@ class ThemeBrowser(QWidget):
             a.setFont(f)
             folders = [key_to_folder(v) for k, v in keys if k == "folder"]
             self._add_move_menu(m, keys, exclude=folders[0] if len(folders) == 1 else None)
+        add_color_menu(m, self, [k for k in keys if k[0] in ("theme", "folder")])
         m.addSeparator()
         m.addAction(theme_icon("delete"), tr("Delete {} items…").format(n) + "\tDel",
                     lambda: self.delete_keys(keys))
         return m
+
+    # ------------------------------------------------------------------
+    # highlight colors
+    # ------------------------------------------------------------------
+    def set_color(self, keys, color):
+        """Color (or with ``None`` un-color) theme/folder rows; undoable."""
+        keys = [tuple(k) for k in keys if k[0] in ("theme", "folder")]
+        if not keys:
+            return
+        previous = self.service.set_colors(keys, color)
+        if any(previous.get(k) != color for k in previous):
+            self.undo.push(tr("highlight color"), lambda: self.service.restore_colors(previous))
+            self.notifier.changed()
+
+    def pick_custom_color(self, keys, initial=None):
+        """Open the QGIS color dialog. The popup has to step aside for it."""
+        host = self.host if self.host is not None and self.host.isVisible() else None
+        if host is not None:
+            host.hide()
+        try:
+            color = QgsColorDialog.getColor(QColor(initial or "#ffffff"), self.window(),
+                                            tr("Highlight color"), False)
+        finally:
+            if host is not None:
+                host.reopen()
+        if color.isValid():
+            self.set_color(keys, color.name())
 
     def _add_move_menu(self, menu, keys, exclude=None):
         sub = menu.addMenu(theme_icon("move"), tr("Move to"))
